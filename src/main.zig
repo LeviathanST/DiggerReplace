@@ -36,13 +36,14 @@ pub fn main() !void {
     defer grid.deinit();
 
     var digger = try Digger.init(0, 0, grid);
+
     rl.setTargetFPS(60);
 
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
-        grid.draw();
+        try grid.draw();
         try digger.draw();
 
         control(&digger);
@@ -53,5 +54,4 @@ pub fn main() !void {
 
 test {
     std.testing.refAllDecls(@This());
-    std.testing.refAllDecls(Grid);
 }
