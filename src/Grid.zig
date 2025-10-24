@@ -88,13 +88,13 @@ pub fn init(
         .num_of_rows = num_of_rows,
         .num_of_cols = num_of_cols,
         ._arena = aa,
-        ._config = try .init(),
+        ._config = .{},
     };
 }
 
 pub fn deinit(self: *Grid) void {
     const alloc = self._arena.child_allocator;
-    self._config.deinit();
+    // self._config.deinit();
     self.alloc.free(self.matrix);
     self._arena.deinit();
     alloc.destroy(self._arena);
@@ -158,7 +158,7 @@ test "get actual position in the grid" {
     try std.testing.expect(grid.matrix[pos1].y == 0); // 0 * (1 + 1)
 
     const pos2 = try grid.getActualIndex(1, 0);
-    try std.testing.expect(pos1 == 0);
+    try std.testing.expect(pos2 == 3);
     try std.testing.expect(grid.matrix[pos2].x == 0); // 0 * (1 + 1)
     try std.testing.expect(grid.matrix[pos2].y == 2); // 1 * (1 + 1)
 
@@ -183,11 +183,11 @@ test "get actual position in the grid" {
     try std.testing.expect(grid2.matrix[pos5].x == 6); // 2 * (2 + 1)
     try std.testing.expect(grid2.matrix[pos5].y == 3); // 2 * (2 + 1)
 
-    try std.testing.expectError(Error.OverNumCol, grid.getActualIndex(2, 3));
-    try std.testing.expectError(Error.OverNumRow, grid.getActualIndex(3, 4));
+    try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(2, 3));
+    try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(3, 4));
 }
 
-pub fn draw(self: Grid) void {
+pub fn draw(self: *Grid) !void {
     for (self.matrix, 0..) |cell, i| {
         rl.drawRectangle(
             @intCast(cell.x),
@@ -197,14 +197,15 @@ pub fn draw(self: Grid) void {
             .blue,
         );
 
+        const main_font = try self._config.getMainFont();
         rl.drawTextEx(
-            self._config.main_font,
+            main_font,
             rl.textFormat("%d", .{i}),
             .{
                 .x = @floatFromInt(cell.x + @divTrunc(cell.width, 2) - 5),
                 .y = @floatFromInt(cell.y + @divTrunc(cell.width, 2) - 5),
             },
-            @as(f32, @floatFromInt(self._config.main_font.baseSize)) / 1.5,
+            @as(f32, @floatFromInt(main_font.baseSize)) / 1.5,
             1,
             .white,
         );

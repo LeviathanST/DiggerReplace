@@ -37,6 +37,10 @@ pub fn build(b: *std.Build) void {
                 .target = t,
                 .optimize = o,
             }),
+            .test_runner = .{
+                .mode = .simple,
+                .path = b.path("test_runner.zig"),
+            },
         });
         const run_test_step = b.step("test", "Run unit tests");
         const run_test = b.addRunArtifact(test_exe);
