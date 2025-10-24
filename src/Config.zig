@@ -1,12 +1,15 @@
 const rl = @import("raylib");
 const Config = @This();
 
-main_font: rl.Font,
+/// This is lazy loading field
+main_font: ?rl.Font = null,
 
-pub fn init() !Config {
-    return .{
-        .main_font = try rl.loadFont("assets/fonts/boldpixelsx1.ttf"),
-    };
+/// Load the lazy variable `main_font`
+pub fn getMainFont(self: *Config) !rl.Font {
+    if (self.main_font == null) {
+        self.main_font = try rl.loadFont("assets/fonts/boldpixelsx1.ttf");
+    }
+    return self.main_font.?;
 }
 
 pub fn deinit(self: Config) void {
