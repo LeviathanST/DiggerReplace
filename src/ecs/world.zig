@@ -116,6 +116,7 @@ pub fn getComponent(
     const actual_s = ErasedComponentStorage.cast(s.ptr, T);
     return actual_s.data.get(entity_id) orelse error.ComponentValueNotFound;
 }
+
 pub fn getMutComponent(
     self: World,
     entity_id: EntityID,
