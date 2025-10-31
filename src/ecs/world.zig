@@ -166,3 +166,41 @@ pub fn run(self: World) !void {
         try system(self);
     }
 }
+
+test "Run systems" {
+    const alloc = std.testing.allocator;
+
+    const Position = struct {
+        x: i32,
+        y: i32,
+    };
+
+    var world: World = .init(alloc);
+    defer world.deinit();
+    world.newComponentStorage("position", Position);
+
+    // Init entity
+    const entity_1 = world.newEntity();
+    try world.setComponent(entity_1, Position, "position", .{ .x = 5, .y = 6 });
+
+    // get the pointer to see changes when `world.run` is executed
+    const comp_value_1 = try world.getMutComponent(entity_1, "position", Position);
+    try std.testing.expect(comp_value_1.x == 5);
+    try std.testing.expect(comp_value_1.y == 6);
+    //
+
+    const move_entity = struct {
+        pub fn move(w: World) !void {
+            const pos = try w.getMutComponent(0, "position", Position);
+
+            pos.x += 1;
+            pos.y += 1;
+        }
+    }.move;
+
+    world.addSystem(move_entity);
+    try world.run();
+
+    try std.testing.expect(comp_value_1.x == 6);
+    try std.testing.expect(comp_value_1.y == 7);
+}
