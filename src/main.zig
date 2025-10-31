@@ -1,40 +1,40 @@
 const std = @import("std");
 const rl = @import("raylib");
+const common_types = @import("common_types.zig");
+const digger = @import("digger.zig");
+const grid = @import("grid.zig");
 
-const Grid = @import("Grid.zig");
-const Digger = @import("Digger.zig");
-
-pub fn control(d: *Digger, g: Grid) void {
-    if (rl.isKeyPressed(.j) and rl.isKeyPressed(.down)) {
-        d.move(g, .down);
-    }
-    if (rl.isKeyPressed(.k) and rl.isKeyPressed(.up)) {
-        d.move(g, .up);
-    }
-    if (rl.isKeyPressed(.h) and rl.isKeyPressed(.left)) {
-        d.move(g, .left);
-    }
-    if (rl.isKeyPressed(.l) and rl.isKeyPressed(.right)) {
-        d.move(g, .right);
-    }
-}
+const World = @import("ecs/world.zig");
+const Grid = common_types.Grid;
 
 fn loop(alloc: std.mem.Allocator) !void {
-    var grid = Grid.init(alloc, 4, 3, 100, 1);
-    defer grid.deinit(alloc);
+    var world: World = .init(alloc);
+    defer world.deinit();
 
-    var digger = Digger.init(0, 0);
+    world.newComponentStorage("position", common_types.Position);
+    world.newComponentStorage("id", usize);
+    world.newComponentStorage("grid", Grid);
+
+    var g = Grid.init(alloc, 4, 3, 100, 1);
+    defer g.deinit(alloc);
+    world.addSystem(grid.draw);
+
+    // Digger entity
+    const d = world.newEntity();
+    try world.setComponent(d, common_types.Position, "position", .{ .x = 0, .y = 0 });
+    try world.setComponent(d, usize, "id", 1);
+    try world.setComponent(d, Grid, "grid", g);
+
+    world.addSystem(digger.control);
+    world.addSystem(digger.draw);
+    //
 
     rl.setTargetFPS(60);
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
-        try grid.draw();
-        try digger.draw(grid);
-
-        control(&digger, grid);
-
+        try world.run();
         rl.clearBackground(.white);
     }
 }
