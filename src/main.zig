@@ -4,18 +4,38 @@ const rl = @import("raylib");
 const Grid = @import("Grid.zig");
 const Digger = @import("Digger.zig");
 
-pub fn control(d: *Digger) void {
-    if (rl.isKeyPressed(.j) or rl.isKeyPressed(.down)) {
-        d.move(.down);
+pub fn control(d: *Digger, g: Grid) void {
+    if (rl.isKeyPressed(.j) and rl.isKeyPressed(.down)) {
+        d.move(g, .down);
     }
-    if (rl.isKeyPressed(.k) or rl.isKeyPressed(.up)) {
-        d.move(.up);
+    if (rl.isKeyPressed(.k) and rl.isKeyPressed(.up)) {
+        d.move(g, .up);
     }
-    if (rl.isKeyPressed(.h) or rl.isKeyPressed(.left)) {
-        d.move(.left);
+    if (rl.isKeyPressed(.h) and rl.isKeyPressed(.left)) {
+        d.move(g, .left);
     }
-    if (rl.isKeyPressed(.l) or rl.isKeyPressed(.right)) {
-        d.move(.right);
+    if (rl.isKeyPressed(.l) and rl.isKeyPressed(.right)) {
+        d.move(g, .right);
+    }
+}
+
+fn loop(alloc: std.mem.Allocator) !void {
+    var grid = Grid.init(alloc, 4, 3, 100, 1);
+    defer grid.deinit(alloc);
+
+    var digger = Digger.init(0, 0);
+
+    rl.setTargetFPS(60);
+    while (!rl.windowShouldClose()) {
+        rl.beginDrawing();
+        defer rl.endDrawing();
+
+        try grid.draw();
+        try digger.draw(grid);
+
+        control(&digger, grid);
+
+        rl.clearBackground(.white);
     }
 }
 
@@ -32,24 +52,7 @@ pub fn main() !void {
     rl.initWindow(screenWidth, screenHeight, "Digger Replace");
     defer rl.closeWindow();
 
-    var grid = try Grid.init(alloc, 4, 3, 100, 1);
-    defer grid.deinit();
-
-    var digger = try Digger.init(0, 0, grid);
-
-    rl.setTargetFPS(60);
-
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
-
-        try grid.draw();
-        try digger.draw();
-
-        control(&digger);
-
-        rl.clearBackground(.white);
-    }
+    try loop(alloc);
 }
 
 test {
