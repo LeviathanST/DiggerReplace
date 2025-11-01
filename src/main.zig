@@ -1,21 +1,41 @@
 const std = @import("std");
 const rl = @import("raylib");
+const common_types = @import("common_types.zig");
+const digger = @import("digger.zig");
+const grid = @import("grid.zig");
 
-const Grid = @import("Grid.zig");
-const Digger = @import("Digger.zig");
+const World = @import("ecs/world.zig");
+const Grid = common_types.Grid;
 
-pub fn control(d: *Digger) void {
-    if (rl.isKeyPressed(.j) or rl.isKeyPressed(.down)) {
-        d.move(.down);
-    }
-    if (rl.isKeyPressed(.k) or rl.isKeyPressed(.up)) {
-        d.move(.up);
-    }
-    if (rl.isKeyPressed(.h) or rl.isKeyPressed(.left)) {
-        d.move(.left);
-    }
-    if (rl.isKeyPressed(.l) or rl.isKeyPressed(.right)) {
-        d.move(.right);
+fn loop(alloc: std.mem.Allocator) !void {
+    var world: World = .init(alloc);
+    defer world.deinit();
+
+    world.newComponentStorage(common_types.Position);
+    world.newComponentStorage(usize);
+    world.newComponentStorage(Grid);
+
+    var g = Grid.init(alloc, 4, 3, 100, 1);
+    defer g.deinit(alloc);
+    world.addSystem(grid.draw);
+
+    // Digger entity
+    const d = world.newEntity();
+    try world.setComponent(d, common_types.Position, .{ .x = 0, .y = 0 });
+    try world.setComponent(d, usize, 1);
+    try world.setComponent(d, Grid, g);
+
+    world.addSystem(digger.control);
+    world.addSystem(digger.draw);
+    //
+
+    rl.setTargetFPS(60);
+    while (!rl.windowShouldClose()) {
+        rl.beginDrawing();
+        defer rl.endDrawing();
+
+        try world.run();
+        rl.clearBackground(.white);
     }
 }
 
@@ -32,24 +52,7 @@ pub fn main() !void {
     rl.initWindow(screenWidth, screenHeight, "Digger Replace");
     defer rl.closeWindow();
 
-    var grid = try Grid.init(alloc, 4, 3, 100, 1);
-    defer grid.deinit();
-
-    var digger = try Digger.init(0, 0, grid);
-
-    rl.setTargetFPS(60);
-
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
-
-        try grid.draw();
-        try digger.draw();
-
-        control(&digger);
-
-        rl.clearBackground(.white);
-    }
+    try loop(alloc);
 }
 
 test {

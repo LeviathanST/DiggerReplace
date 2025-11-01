@@ -13,5 +13,5 @@ pub fn getMainFont(self: *Config) !rl.Font {
 }
 
 pub fn deinit(self: Config) void {
-    self.main_font.unload();
+    self.main_font.?.unload();
 }
