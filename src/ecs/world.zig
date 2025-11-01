@@ -18,7 +18,7 @@ entity_count: usize = 0,
 /// |------------|   |------------|
 ///
 /// Get data of a component via `get('name_of_your_component')`
-component_storages: std.StringHashMap(ErasedComponentStorage),
+component_storages: std.AutoHashMap(u64, ErasedComponentStorage),
 systems: std.ArrayList(SystemFn),
 alloc: std.mem.Allocator,
 _arena: *std.heap.ArenaAllocator,
@@ -59,7 +59,6 @@ pub fn newEntity(self: *World) EntityID {
 /// This function can cause to `panic` due to out of memory
 pub fn newComponentStorage(
     self: *World,
-    name: []const u8,
     comptime T: type,
 ) void {
     const storage = self.alloc.create(ComponentStorage(T)) catch @panic("OOM");
@@ -68,7 +67,8 @@ pub fn newComponentStorage(
         .data = .empty,
     };
 
-    self.component_storages.put(name, .{
+    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
+    self.component_storages.put(hash, .{
         .ptr = storage,
         .deinit_fn = struct {
             pub fn deinit(ptr: *anyopaque, alloc: std.mem.Allocator) void {
@@ -84,13 +84,13 @@ pub fn setComponent(
     self: *World,
     entity_id: EntityID,
     comptime T: type,
-    component_name: []const u8,
     component_value: T,
 ) !void {
-    // Get the storage of `T` component by `name`.
+    // Get the storage of `T` component by hash.
+    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
     const r = self
         .component_storages
-        .get(component_name) orelse return error.ComponentStorageNotFound;
+        .get(hash) orelse return error.ComponentStorageNotFound;
 
     const actual_s = ErasedComponentStorage.cast(r.ptr, T);
 
@@ -106,12 +106,12 @@ pub fn setComponent(
 pub fn getComponent(
     self: World,
     entity_id: EntityID,
-    name: []const u8,
     comptime T: type,
 ) !T {
+    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
     const s = self
         .component_storages
-        .get(name) orelse return error.ComponentStorageNotFound;
+        .get(hash) orelse return error.ComponentStorageNotFound;
 
     const actual_s = ErasedComponentStorage.cast(s.ptr, T);
     return actual_s.data.get(entity_id) orelse error.ComponentValueNotFound;
@@ -120,12 +120,12 @@ pub fn getComponent(
 pub fn getMutComponent(
     self: World,
     entity_id: EntityID,
-    name: []const u8,
     comptime T: type,
 ) !*T {
+    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
     const s = self
         .component_storages
-        .get(name) orelse return error.ComponentStorageNotFound;
+        .get(hash) orelse return error.ComponentStorageNotFound;
 
     const actual_s = ErasedComponentStorage.cast(s.ptr, T);
     return actual_s.data.getPtr(entity_id) orelse error.ComponentValueNotFound;
@@ -141,19 +141,19 @@ test "Init entities" {
 
     var world: World = .init(alloc);
     defer world.deinit();
-    world.newComponentStorage("position", Position);
+    world.newComponentStorage(Position);
 
     const entity_1 = world.newEntity();
-    try world.setComponent(entity_1, Position, "position", .{ .x = 5, .y = 6 });
+    try world.setComponent(entity_1, Position, .{ .x = 5, .y = 6 });
 
-    const comp_value_1 = try world.getComponent(entity_1, "position", Position);
+    const comp_value_1 = try world.getComponent(entity_1, Position);
     try std.testing.expect(comp_value_1.x == 5);
     try std.testing.expect(comp_value_1.y == 6);
 
     const entity_2 = world.newEntity();
-    try world.setComponent(entity_2, Position, "position", .{ .x = 10, .y = 6 });
+    try world.setComponent(entity_2, Position, .{ .x = 10, .y = 6 });
 
-    const comp_value_2 = try world.getComponent(entity_2, "position", Position);
+    const comp_value_2 = try world.getComponent(entity_2, Position);
     try std.testing.expect(comp_value_2.x == 10);
     try std.testing.expect(comp_value_2.y == 6);
 }
@@ -178,21 +178,21 @@ test "Run systems" {
 
     var world: World = .init(alloc);
     defer world.deinit();
-    world.newComponentStorage("position", Position);
+    world.newComponentStorage(Position);
 
     // Init entity
     const entity_1 = world.newEntity();
-    try world.setComponent(entity_1, Position, "position", .{ .x = 5, .y = 6 });
+    try world.setComponent(entity_1, Position, .{ .x = 5, .y = 6 });
 
     // get the pointer to see changes when `world.run` is executed
-    const comp_value_1 = try world.getMutComponent(entity_1, "position", Position);
+    const comp_value_1 = try world.getMutComponent(entity_1, Position);
     try std.testing.expect(comp_value_1.x == 5);
     try std.testing.expect(comp_value_1.y == 6);
     //
 
     const move_entity = struct {
         pub fn move(w: World) !void {
-            const pos = try w.getMutComponent(0, "position", Position);
+            const pos = try w.getMutComponent(0, Position);
 
             pos.x += 1;
             pos.y += 1;

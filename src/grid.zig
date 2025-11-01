@@ -6,7 +6,7 @@ const Config = @import("Config.zig");
 const Grid = @import("common_types.zig").Grid;
 
 pub fn draw(w: World) !void {
-    const grid = try w.getComponent(0, "grid", Grid);
+    const grid = try w.getComponent(0, Grid);
 
     for (grid.matrix, 0..) |cell, i| {
         rl.drawRectangle(

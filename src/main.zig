@@ -11,9 +11,9 @@ fn loop(alloc: std.mem.Allocator) !void {
     var world: World = .init(alloc);
     defer world.deinit();
 
-    world.newComponentStorage("position", common_types.Position);
-    world.newComponentStorage("id", usize);
-    world.newComponentStorage("grid", Grid);
+    world.newComponentStorage(common_types.Position);
+    world.newComponentStorage(usize);
+    world.newComponentStorage(Grid);
 
     var g = Grid.init(alloc, 4, 3, 100, 1);
     defer g.deinit(alloc);
@@ -21,9 +21,9 @@ fn loop(alloc: std.mem.Allocator) !void {
 
     // Digger entity
     const d = world.newEntity();
-    try world.setComponent(d, common_types.Position, "position", .{ .x = 0, .y = 0 });
-    try world.setComponent(d, usize, "id", 1);
-    try world.setComponent(d, Grid, "grid", g);
+    try world.setComponent(d, common_types.Position, .{ .x = 0, .y = 0 });
+    try world.setComponent(d, usize, 1);
+    try world.setComponent(d, Grid, g);
 
     world.addSystem(digger.control);
     world.addSystem(digger.draw);

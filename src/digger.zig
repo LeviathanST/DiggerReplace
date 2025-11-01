@@ -30,8 +30,8 @@ pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) v
 }
 
 pub fn control(w: World) !void {
-    const pos = try w.getMutComponent(0, "position", Position);
-    const grid = try w.getComponent(0, "grid", Grid);
+    const pos = try w.getMutComponent(0, Position);
+    const grid = try w.getComponent(0, Grid);
 
     if (rl.isKeyPressed(.j) or rl.isKeyPressed(.down)) {
         move(pos, grid, .down);
@@ -48,8 +48,8 @@ pub fn control(w: World) !void {
 }
 
 pub fn draw(w: World) !void {
-    const p = try w.getComponent(0, "position", Position);
-    const grid = try w.getComponent(0, "grid", Grid);
+    const p = try w.getComponent(0, Position);
+    const grid = try w.getComponent(0, Grid);
 
     const pos = grid.matrix[@intCast(try grid.getActualIndex(p.x, p.y))];
     const pos_x = pos.x + @divTrunc(pos.width, 2);
