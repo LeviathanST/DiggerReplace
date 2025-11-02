@@ -67,7 +67,7 @@ pub fn newComponentStorage(
         .data = .empty,
     };
 
-    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
+    const hash = std.hash_map.hashString(@typeName(T));
     self.component_storages.put(hash, .{
         .ptr = storage,
         .deinit_fn = struct {
@@ -87,7 +87,7 @@ pub fn setComponent(
     component_value: T,
 ) !void {
     // Get the storage of `T` component by hash.
-    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
+    const hash = std.hash_map.hashString(@typeName(T));
     const r = self
         .component_storages
         .get(hash) orelse return error.ComponentStorageNotFound;
@@ -108,7 +108,7 @@ pub fn getComponent(
     entity_id: EntityID,
     comptime T: type,
 ) !T {
-    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
+    const hash = std.hash_map.hashString(@typeName(T));
     const s = self
         .component_storages
         .get(hash) orelse return error.ComponentStorageNotFound;
@@ -122,7 +122,7 @@ pub fn getMutComponent(
     entity_id: EntityID,
     comptime T: type,
 ) !*T {
-    const hash = std.hash_map.hashString(@typeName(@TypeOf(T)));
+    const hash = std.hash_map.hashString(@typeName(T));
     const s = self
         .component_storages
         .get(hash) orelse return error.ComponentStorageNotFound;
