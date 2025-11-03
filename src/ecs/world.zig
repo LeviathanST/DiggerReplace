@@ -1,5 +1,11 @@
+//! # Features:
+//! * [x] Create and get new entity (entity_id).
+//! * [x] Set, get component by `entity_id`.
+//! * [x] Query entities with specific components.
 const std = @import("std");
 const component = @import("component.zig");
+
+const ecs_util = @import("util.zig");
 
 const ErasedComponentStorage = component.ErasedStorage;
 const ComponentStorage = component.Storage;
@@ -204,4 +210,283 @@ test "Run systems" {
 
     try std.testing.expect(comp_value_1.x == 6);
     try std.testing.expect(comp_value_1.y == 7);
+}
+
+/// Matching enittiy ids between `l1` and `l2`.
+/// The result will be written to l1 and the order of
+/// elements following `l1`.
+///
+/// If one of lists is `null`, assign remaining value to `dest`.
+fn findMatch(
+    alloc: std.mem.Allocator,
+    l1: *std.ArrayList(EntityID),
+    l2: std.ArrayList(EntityID),
+) !void {
+    if (l2.items.len == 0) return;
+    if (l1.items.len == 0) {
+        l1.clearAndFree(alloc);
+        try l1.appendSlice(alloc, l2.items);
+        return;
+    }
+
+    var l: std.ArrayList(EntityID) = .empty;
+    defer l.deinit(alloc);
+    outer: for (l1.items) |it1| {
+        for (l2.items) |it2| {
+            if (it2 == it1) {
+                try l.append(alloc, it1);
+                continue :outer;
+            }
+        }
+    }
+
+    l1.clearAndFree(alloc);
+    try l1.appendSlice(alloc, l.items);
+}
+
+test "find match" {
+    const alloc = std.testing.allocator;
+    var l1: std.ArrayList(EntityID) = .empty;
+    defer l1.deinit(alloc);
+
+    var buf2 = [_]EntityID{ 1, 2, 3, 6 };
+    var l2: std.ArrayList(EntityID) = .empty;
+    defer l2.deinit(alloc);
+    try l2.appendSlice(alloc, &buf2);
+
+    try findMatch(alloc, &l2, l1);
+    try std.testing.expectEqualSlices(EntityID, &[_]EntityID{ 1, 2, 3, 6 }, l2.items);
+
+    var buf3 = [_]EntityID{ 1, 3, 2, 7, 8 };
+    var l3: std.ArrayList(EntityID) = .empty;
+    defer l3.deinit(alloc);
+    try l3.appendSlice(alloc, &buf3);
+
+    var buf4 = [_]EntityID{ 1, 5, 2, 3, 6, 10, 2 };
+    var l4: std.ArrayList(EntityID) = .empty;
+    defer l4.deinit(alloc);
+    try l4.appendSlice(alloc, &buf4);
+
+    try findMatch(alloc, &l3, l4);
+    try std.testing.expectEqualSlices(EntityID, &[_]EntityID{ 1, 3, 2 }, l3.items);
+
+    try findMatch(alloc, &l2, l3);
+    try std.testing.expectEqualSlices(EntityID, &[_]EntityID{ 1, 2, 3 }, l2.items);
+}
+
+// Return type of `getKeysOfMinStorage()`.
+const KeyMin = struct {
+    items: []EntityID,
+    idx: usize,
+
+    pub fn deinit(self: *KeyMin, alloc: std.mem.Allocator) void {
+        alloc.free(self.items);
+    }
+};
+
+/// Get all keys of a storage in `types`
+/// which has the `fewest` elements.
+///
+/// The caller should call `deinit()` after finish.
+fn getKeysOfMinStorage(w: World, comptime types: []const type) !KeyMin {
+    // NOTE: always get the first component
+    var min: u32 = std.math.maxInt(u32);
+    var idx: usize = 0;
+
+    // get the index of the storage
+    inline for (types, 0..) |T, i| {
+        const Type = ecs_util.Deref(T);
+        const hash = std.hash_map.hashString(@typeName(Type));
+        const s = w.component_storages.get(hash) orelse return error.ComponentStorageNotFound;
+        const size = ErasedComponentStorage.cast(s.ptr, Type).data.size;
+
+        if (min >= size) {
+            min = size;
+            idx = i;
+        }
+    }
+
+    var keys_list: std.ArrayList(u64) = .empty;
+    defer keys_list.deinit(w.alloc);
+
+    // get the value of min
+    inline for (types, 0..) |T, i| {
+        if (idx == i) {
+            const Type = ecs_util.Deref(T);
+            const hash = std.hash_map.hashString(@typeName(Type));
+            const s = w.component_storages.get(hash) orelse return error.ComponentStorageNotFound;
+            var iter = ErasedComponentStorage
+                .cast(s.ptr, Type)
+                .data
+                .keyIterator();
+
+            while (iter.next()) |it| {
+                try keys_list.append(w.alloc, it.*);
+            }
+
+            return .{
+                .items = try keys_list.toOwnedSlice(w.alloc),
+                .idx = idx,
+            };
+        }
+    }
+
+    unreachable;
+}
+
+test "get keys of min storage" {
+    const Position = struct { x: i32, y: i32 };
+    const Velocity = struct { x: i32, y: i32 };
+
+    const alloc = std.testing.allocator;
+    var w: World = .init(alloc);
+    defer w.deinit();
+
+    w.newComponentStorage(Position);
+    w.newComponentStorage(Velocity);
+
+    const p1 = w.newEntity();
+    try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
+    try w.setComponent(p1, Velocity, .{ .x = 1, .y = 2 });
+
+    const p2 = w.newEntity();
+    try w.setComponent(p2, Position, .{ .x = 1, .y = 2 });
+    try w.setComponent(p2, Velocity, .{ .x = 5, .y = 10 });
+
+    const p3 = w.newEntity();
+    try w.setComponent(p3, Position, .{ .x = 1, .y = 2 });
+
+    var k1 = try w.getKeysOfMinStorage(&.{ Position, Velocity });
+    defer k1.deinit(w.alloc);
+
+    try std.testing.expectEqual(1, k1.idx);
+    try std.testing.expectEqualSlices(u64, &.{ 1, 0 }, k1.items);
+
+    // add one more component
+    const Weapon = struct { name: []const u8 };
+    w.newComponentStorage(Weapon);
+    try w.setComponent(p2, Weapon, .{ .name = "sword" });
+
+    var k2 = try w.getKeysOfMinStorage(&.{ Position, Velocity, Weapon });
+    defer k2.deinit(w.alloc);
+
+    try std.testing.expectEqual(2, k2.idx);
+    try std.testing.expectEqualSlices(u64, &.{1}, k2.items);
+}
+
+/// Get entities's components
+///
+/// # Examples:
+/// ```zig
+/// var result = query(&.{Position, Velocity})
+/// for (result) |entity| {
+///     const pos: Position, const vec: Velocity = entity;
+///     ...
+/// }
+/// ```
+pub fn query(w: World, comptime types: []const type) ![]std.meta.Tuple(types) {
+    // The temporarily list to contain entity ids from `types[index]`
+    var temp_list: std.ArrayList(EntityID) = .empty;
+    defer temp_list.deinit(w.alloc);
+
+    var min_storage = try w.getKeysOfMinStorage(types);
+    defer min_storage.deinit(w.alloc);
+
+    // assign the storage which has the fewest elements first
+    var result_list: std.ArrayList(EntityID) = .fromOwnedSlice(min_storage.items);
+    defer result_list.deinit(w.alloc);
+
+    inline for (types, 0..) |T, i| {
+        // use label to control flow in comptime
+        skip_min: {
+            // skip the min_storage because its available
+            // in the result list
+            if (i == min_storage.idx) break :skip_min;
+
+            const Type = ecs_util.Deref(T);
+            const hash = std.hash_map.hashString(@typeName(Type));
+            const s = w.component_storages.get(hash) orelse {
+                std.log.err("Component storage of `{s}` not found!", .{@typeName(Type)});
+                return error.ComponentStorageNotFound;
+            };
+            const actual_s = ErasedComponentStorage.cast(s.ptr, Type);
+
+            var data_iter = actual_s.data.keyIterator();
+            while (data_iter.next()) |it| {
+                try temp_list.append(w.alloc, it.*);
+            }
+            try findMatch(w.alloc, &result_list, temp_list);
+
+            // reset l1
+            temp_list.clearAndFree(w.alloc);
+        }
+    }
+
+    var tuple_list: std.ArrayList(std.meta.Tuple(types)) = .empty;
+    defer tuple_list.deinit(w.alloc);
+
+    for (result_list.items) |entity_id| {
+        var tuple: std.meta.Tuple(types) = undefined;
+        inline for (types, 0..) |T, i| {
+            if (@typeInfo(T) == .pointer) {
+                tuple[i] = try w.getMutComponent(entity_id, std.meta.Child(T));
+            } else {
+                tuple[i] = try w.getComponent(entity_id, T);
+            }
+        }
+        try tuple_list.append(w.alloc, tuple);
+    }
+
+    return tuple_list.toOwnedSlice(w.alloc);
+}
+
+test "query" {
+    const Position = struct { x: i32, y: i32 };
+    const Velocity = struct { x: i32, y: i32 };
+
+    const alloc = std.testing.allocator;
+    var w: World = .init(alloc);
+    defer w.deinit();
+
+    w.newComponentStorage(Position);
+    w.newComponentStorage(Velocity);
+
+    const p1 = w.newEntity();
+    try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
+    try w.setComponent(p1, Velocity, .{ .x = 1, .y = 2 });
+
+    const p2 = w.newEntity();
+    try w.setComponent(p2, Position, .{ .x = 1, .y = 2 });
+    try w.setComponent(p2, Velocity, .{ .x = 5, .y = 10 });
+
+    const p3 = w.newEntity();
+    try w.setComponent(p3, Position, .{ .x = 1, .y = 2 });
+
+    const queries = try query(w, &.{ Position, *Velocity });
+    defer w.alloc.free(queries);
+
+    try std.testing.expect(queries.len == 2);
+
+    // Get components
+    const pos_0: Position, const vec_0: *Velocity = queries[0];
+    try std.testing.expect(pos_0.x == 1);
+    try std.testing.expect(pos_0.y == 2);
+    try std.testing.expect(vec_0.x == 5);
+    try std.testing.expect(vec_0.y == 10);
+
+    const pos_1: Position, const vec_1: *Velocity = queries[1];
+    try std.testing.expect(pos_1.x == 1);
+    try std.testing.expect(pos_1.y == 2);
+    try std.testing.expect(vec_1.x == 1);
+    try std.testing.expect(vec_1.y == 2);
+    //
+    vec_1.*.x += 1; // changes value
+
+    // get again to see if the value was changed
+    const queries2 = try query(w, &.{ Position, Velocity });
+    defer w.alloc.free(queries2);
+
+    const pos_2: Position, const vec_2: Velocity = queries2[1];
+    try std.testing.expect(pos_2.x == 1);
+    try std.testing.expect(vec_2.x == 2);
 }
