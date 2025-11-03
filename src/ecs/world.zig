@@ -44,7 +44,7 @@ pub fn init(alloc: std.mem.Allocator) World {
 pub fn deinit(self: *World) void {
     var storage_iter = self.component_storages.iterator();
     while (storage_iter.next()) |entry| {
-        entry.value_ptr.*.deinit_fn(entry.value_ptr.ptr, self.alloc);
+        entry.value_ptr.*.deinit_fn(self.*, self.alloc);
     }
 
     self.component_storages.deinit();
@@ -77,8 +77,8 @@ pub fn newComponentStorage(
     self.component_storages.put(hash, .{
         .ptr = storage,
         .deinit_fn = struct {
-            pub fn deinit(ptr: *anyopaque, alloc: std.mem.Allocator) void {
-                const s = ErasedComponentStorage.cast(ptr, T);
+            pub fn deinit(w: World, alloc: std.mem.Allocator) void {
+                const s = ErasedComponentStorage.cast(w, T) catch unreachable;
                 s.deinit(alloc);
             }
         }.deinit,
@@ -92,17 +92,12 @@ pub fn setComponent(
     comptime T: type,
     component_value: T,
 ) !void {
-    // Get the storage of `T` component by hash.
-    const hash = std.hash_map.hashString(@typeName(T));
-    const r = self
-        .component_storages
-        .get(hash) orelse return error.ComponentStorageNotFound;
-
-    const actual_s = ErasedComponentStorage.cast(r.ptr, T);
+    // get the storage
+    const s = try ErasedComponentStorage.cast(self.*, T);
 
     // Append the value of the component to data
     // list in the storage
-    actual_s.data.put(
+    s.data.put(
         self.alloc,
         entity_id,
         component_value,
@@ -114,13 +109,8 @@ pub fn getComponent(
     entity_id: EntityID,
     comptime T: type,
 ) !T {
-    const hash = std.hash_map.hashString(@typeName(T));
-    const s = self
-        .component_storages
-        .get(hash) orelse return error.ComponentStorageNotFound;
-
-    const actual_s = ErasedComponentStorage.cast(s.ptr, T);
-    return actual_s.data.get(entity_id) orelse error.ComponentValueNotFound;
+    const s = try ErasedComponentStorage.cast(self, T);
+    return s.data.get(entity_id) orelse error.ComponentValueNotFound;
 }
 
 pub fn getMutComponent(
@@ -128,13 +118,8 @@ pub fn getMutComponent(
     entity_id: EntityID,
     comptime T: type,
 ) !*T {
-    const hash = std.hash_map.hashString(@typeName(T));
-    const s = self
-        .component_storages
-        .get(hash) orelse return error.ComponentStorageNotFound;
-
-    const actual_s = ErasedComponentStorage.cast(s.ptr, T);
-    return actual_s.data.getPtr(entity_id) orelse error.ComponentValueNotFound;
+    const s = try ErasedComponentStorage.cast(self, T);
+    return s.data.getPtr(entity_id) orelse error.ComponentValueNotFound;
 }
 
 test "Init entities" {
@@ -288,7 +273,7 @@ const KeyMin = struct {
 /// which has the `fewest` elements.
 ///
 /// The caller should call `deinit()` after finish.
-fn getKeysOfMinStorage(w: World, comptime types: []const type) !KeyMin {
+fn getKeysOfMinStorage(self: World, comptime types: []const type) !KeyMin {
     // NOTE: always get the first component
     var min: u32 = std.math.maxInt(u32);
     var idx: usize = 0;
@@ -296,9 +281,10 @@ fn getKeysOfMinStorage(w: World, comptime types: []const type) !KeyMin {
     // get the index of the storage
     inline for (types, 0..) |T, i| {
         const Type = ecs_util.Deref(T);
-        const hash = std.hash_map.hashString(@typeName(Type));
-        const s = w.component_storages.get(hash) orelse return error.ComponentStorageNotFound;
-        const size = ErasedComponentStorage.cast(s.ptr, Type).data.size;
+        const size = (try ErasedComponentStorage
+            .cast(self, Type))
+            .data
+            .size;
 
         if (min >= size) {
             min = size;
@@ -307,25 +293,23 @@ fn getKeysOfMinStorage(w: World, comptime types: []const type) !KeyMin {
     }
 
     var keys_list: std.ArrayList(u64) = .empty;
-    defer keys_list.deinit(w.alloc);
+    defer keys_list.deinit(self.alloc);
 
     // get the value of min
     inline for (types, 0..) |T, i| {
         if (idx == i) {
             const Type = ecs_util.Deref(T);
-            const hash = std.hash_map.hashString(@typeName(Type));
-            const s = w.component_storages.get(hash) orelse return error.ComponentStorageNotFound;
-            var iter = ErasedComponentStorage
-                .cast(s.ptr, Type)
+            var iter = (try ErasedComponentStorage
+                .cast(self, Type))
                 .data
                 .keyIterator();
 
             while (iter.next()) |it| {
-                try keys_list.append(w.alloc, it.*);
+                try keys_list.append(self.alloc, it.*);
             }
 
             return .{
-                .items = try keys_list.toOwnedSlice(w.alloc),
+                .items = try keys_list.toOwnedSlice(self.alloc),
                 .idx = idx,
             };
         }
@@ -384,17 +368,17 @@ test "get keys of min storage" {
 ///     ...
 /// }
 /// ```
-pub fn query(w: World, comptime types: []const type) ![]std.meta.Tuple(types) {
+pub fn query(self: World, comptime types: []const type) ![]std.meta.Tuple(types) {
     // The temporarily list to contain entity ids from `types[index]`
     var temp_list: std.ArrayList(EntityID) = .empty;
-    defer temp_list.deinit(w.alloc);
+    defer temp_list.deinit(self.alloc);
 
-    var min_storage = try w.getKeysOfMinStorage(types);
-    defer min_storage.deinit(w.alloc);
+    var min_storage = try self.getKeysOfMinStorage(types);
+    defer min_storage.deinit(self.alloc);
 
     // assign the storage which has the fewest elements first
     var result_list: std.ArrayList(EntityID) = .fromOwnedSlice(min_storage.items);
-    defer result_list.deinit(w.alloc);
+    defer result_list.deinit(self.alloc);
 
     inline for (types, 0..) |T, i| {
         // use label to control flow in comptime
@@ -404,40 +388,43 @@ pub fn query(w: World, comptime types: []const type) ![]std.meta.Tuple(types) {
             if (i == min_storage.idx) break :skip_min;
 
             const Type = ecs_util.Deref(T);
-            const hash = std.hash_map.hashString(@typeName(Type));
-            const s = w.component_storages.get(hash) orelse {
-                std.log.err("Component storage of `{s}` not found!", .{@typeName(Type)});
-                return error.ComponentStorageNotFound;
-            };
-            const actual_s = ErasedComponentStorage.cast(s.ptr, Type);
+            const s = try ErasedComponentStorage.cast(self, Type);
 
-            var data_iter = actual_s.data.keyIterator();
+            var data_iter = s.data.keyIterator();
             while (data_iter.next()) |it| {
-                try temp_list.append(w.alloc, it.*);
+                try temp_list.append(self.alloc, it.*);
             }
-            try findMatch(w.alloc, &result_list, temp_list);
+            try findMatch(self.alloc, &result_list, temp_list);
 
             // reset l1
-            temp_list.clearAndFree(w.alloc);
+            temp_list.clearAndFree(self.alloc);
         }
     }
 
-    var tuple_list: std.ArrayList(std.meta.Tuple(types)) = .empty;
-    defer tuple_list.deinit(w.alloc);
+    return self.tuplesFromTypes(result_list.items, types);
+}
 
-    for (result_list.items) |entity_id| {
+fn tuplesFromTypes(
+    self: World,
+    entities: []const EntityID,
+    comptime types: []const type,
+) ![]std.meta.Tuple(types) {
+    var tuple_list: std.ArrayList(std.meta.Tuple(types)) = .empty;
+    defer tuple_list.deinit(self.alloc);
+
+    for (entities) |entity_id| {
         var tuple: std.meta.Tuple(types) = undefined;
         inline for (types, 0..) |T, i| {
             if (@typeInfo(T) == .pointer) {
-                tuple[i] = try w.getMutComponent(entity_id, std.meta.Child(T));
+                tuple[i] = try self.getMutComponent(entity_id, std.meta.Child(T));
             } else {
-                tuple[i] = try w.getComponent(entity_id, T);
+                tuple[i] = try self.getComponent(entity_id, T);
             }
         }
-        try tuple_list.append(w.alloc, tuple);
+        try tuple_list.append(self.alloc, tuple);
     }
 
-    return tuple_list.toOwnedSlice(w.alloc);
+    return tuple_list.toOwnedSlice(self.alloc);
 }
 
 test "query" {
