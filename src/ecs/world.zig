@@ -64,6 +64,18 @@ pub fn newEntity(self: *World) EntityID {
     return id;
 }
 
+pub fn spawnEntity(
+    self: *World,
+    comptime types: []const type,
+    values: std.meta.Tuple(types),
+) void {
+    const id = self.newEntity();
+
+    inline for (types, 0..) |T, i| {
+        try self.setComponent(id, T, values[i]);
+    }
+}
+
 /// Create a new component `T` storage with `name`.
 ///
 /// This function can cause to `panic` due to out of memory
@@ -339,16 +351,19 @@ test "get keys of min storage" {
     var w: World = .init(alloc);
     defer w.deinit();
 
-    const p1 = w.newEntity();
-    try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
-    try w.setComponent(p1, Velocity, .{ .x = 1, .y = 2 });
+    w.spawnEntity(&.{ Position, Velocity }, .{
+        .{ .x = 1, .y = 2 },
+        .{ .x = 1, .y = 2 },
+    });
 
-    const p2 = w.newEntity();
-    try w.setComponent(p2, Position, .{ .x = 1, .y = 2 });
-    try w.setComponent(p2, Velocity, .{ .x = 5, .y = 10 });
+    w.spawnEntity(&.{ Position, Velocity }, .{
+        .{ .x = 1, .y = 2 },
+        .{ .x = 5, .y = 10 },
+    });
 
-    const p3 = w.newEntity();
-    try w.setComponent(p3, Position, .{ .x = 1, .y = 2 });
+    w.spawnEntity(&.{Position}, .{
+        .{ .x = 1, .y = 2 },
+    });
 
     var k1 = try w.getKeysOfMinStorage(&.{ Position, Velocity });
     defer k1.deinit(w.alloc);
@@ -358,7 +373,7 @@ test "get keys of min storage" {
 
     // add one more component
     const Weapon = struct { name: []const u8 };
-    try w.setComponent(p2, Weapon, .{ .name = "sword" });
+    try w.setComponent(1, Weapon, .{ .name = "sword" });
 
     var k2 = try w.getKeysOfMinStorage(&.{ Position, Velocity, Weapon });
     defer k2.deinit(w.alloc);
@@ -440,6 +455,8 @@ fn tuplesFromTypes(
 }
 
 test "query" {
+    const Player = struct { name: []const u8 };
+    const Monster = struct { name: []const u8 };
     const Position = struct { x: i32, y: i32 };
     const Velocity = struct { x: i32, y: i32 };
 
@@ -447,16 +464,22 @@ test "query" {
     var w: World = .init(alloc);
     defer w.deinit();
 
-    const p1 = w.newEntity();
-    try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
-    try w.setComponent(p1, Velocity, .{ .x = 1, .y = 2 });
+    w.spawnEntity(&.{ Player, Position, Velocity }, .{
+        .{ .name = "test_player" },
+        .{ .x = 1, .y = 2 },
+        .{ .x = 1, .y = 2 },
+    });
 
-    const p2 = w.newEntity();
-    try w.setComponent(p2, Position, .{ .x = 1, .y = 2 });
-    try w.setComponent(p2, Velocity, .{ .x = 5, .y = 10 });
+    w.spawnEntity(&.{ Monster, Position, Velocity }, .{
+        .{ .name = "test_monster1" },
+        .{ .x = 1, .y = 2 },
+        .{ .x = 5, .y = 10 },
+    });
 
-    const p3 = w.newEntity();
-    try w.setComponent(p3, Position, .{ .x = 1, .y = 2 });
+    w.spawnEntity(&.{ Monster, Position }, .{
+        .{ .name = "test_monster2" },
+        .{ .x = 1, .y = 2 },
+    });
 
     const queries = try query(w, &.{ Position, *Velocity });
     defer w.alloc.free(queries);
@@ -485,4 +508,22 @@ test "query" {
     const pos_2: Position, const vec_2: Velocity = queries2[1];
     try std.testing.expect(pos_2.x == 1);
     try std.testing.expect(vec_2.x == 2);
+
+    const player_queries = try query(w, &.{ Player, *Position });
+    defer w.alloc.free(queries);
+    try std.testing.expectEqual(1, player_queries.len);
+
+    const player, const player_pos = player_queries[0];
+    player_pos.x += 1;
+    try std.testing.expectEqualSlices(u8, "test_player", player.name);
+    try std.testing.expectEqual(player_pos.x, 2);
+
+    const monster_queries = try query(w, &.{ Monster, Position });
+    try std.testing.expectEqual(2, monster_queries.len);
+
+    const monster1, _ = monster_queries[0];
+    const monster2, _ = monster_queries[1];
+
+    try std.testing.expectEqualSlices(u8, "test_monster1", monster1.name);
+    try std.testing.expectEqualSlices(u8, "test_monster2", monster2.name);
 }
