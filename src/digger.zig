@@ -52,7 +52,7 @@ pub fn control(w: World) !void {
 
 /// Draw all diggers
 pub fn draw(w: World) !void {
-    const queries = try w.query(&.{ *Position, InGrid });
+    const queries = try w.query(&.{ Position, InGrid });
 
     for (queries) |query| {
         const pos, const in_grid = query;
