@@ -14,16 +14,16 @@ fn loop(alloc: std.mem.Allocator) !void {
     world.newComponentStorage(common_types.Position);
     world.newComponentStorage(usize);
     world.newComponentStorage(Grid);
+    world.newComponentStorage(digger.InGrid);
 
-    var g = Grid.init(alloc, 4, 3, 100, 1);
-    defer g.deinit(alloc);
+    const g = world.newEntity();
+    try world.setComponent(g, Grid, .init(world.alloc, 3, 3, 100, 5));
     world.addSystem(grid.draw);
 
     // Digger entity
     const d = world.newEntity();
     try world.setComponent(d, common_types.Position, .{ .x = 0, .y = 0 });
-    try world.setComponent(d, usize, 1);
-    try world.setComponent(d, Grid, g);
+    try world.setComponent(d, digger.InGrid, .{ .grid_entity = g });
 
     world.addSystem(digger.control);
     world.addSystem(digger.draw);
