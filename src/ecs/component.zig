@@ -8,6 +8,14 @@ pub fn Storage(comptime T: type) type {
         data: std.AutoHashMapUnmanaged(EntityID, T),
 
         pub fn deinit(self: *@This(), alloc: std.mem.Allocator) void {
+            if (std.meta.hasFn(T, "deinit")) {
+                var data_iter = self.data.valueIterator();
+                std.log.debug("Total entries: {d} - {s}", .{ self.data.size, @typeName(T) });
+                std.log.debug("Deinit component - {s}", .{@typeName(T)});
+                while (data_iter.next()) |data| {
+                    data.deinit(alloc);
+                }
+            }
             self.data.deinit(alloc);
         }
     };

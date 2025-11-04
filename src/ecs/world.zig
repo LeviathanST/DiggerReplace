@@ -86,6 +86,7 @@ pub fn newComponentStorage(
             }
         }.deinit,
     }) catch @panic("OOM");
+    std.log.debug("Add component - {s}", .{@typeName(T)});
 }
 
 /// If a component `type` is reassigned, it will be overwritten
