@@ -11,11 +11,6 @@ fn loop(alloc: std.mem.Allocator) !void {
     var world: World = .init(alloc);
     defer world.deinit();
 
-    world.newComponentStorage(common_types.Position);
-    world.newComponentStorage(usize);
-    world.newComponentStorage(Grid);
-    world.newComponentStorage(digger.InGrid);
-
     const g = world.newEntity();
     try world.setComponent(g, Grid, .init(world.alloc, 3, 3, 100, 5));
     world.addSystem(grid.draw);

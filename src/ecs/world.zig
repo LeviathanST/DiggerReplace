@@ -1,7 +1,8 @@
 //! # Features:
-//! * [x] Create and get new entity (entity_id).
-//! * [x] Set, get component by `entity_id`.
-//! * [x] Query entities with specific components.
+//! * Create and get new entity (entity_id).
+//! * Lazy init storages.
+//! * Set, get component by `entity_id`.
+//! * Query entities with specific components.
 const std = @import("std");
 const component = @import("component.zig");
 
@@ -69,7 +70,7 @@ pub fn newEntity(self: *World) EntityID {
 pub fn newComponentStorage(
     self: *World,
     comptime T: type,
-) void {
+) *ComponentStorage(T) {
     const storage = self.alloc.create(ComponentStorage(T)) catch @panic("OOM");
     errdefer self.alloc.destroy(storage);
     storage.* = .{
@@ -86,11 +87,17 @@ pub fn newComponentStorage(
             }
         }.deinit,
     }) catch @panic("OOM");
+
     std.log.debug("Add component - {s}", .{@typeName(T)});
+    return ErasedComponentStorage.cast(self.*, T) catch unreachable;
 }
 
 /// If a component `type` is reassigned, it will be overwritten
 /// the old value in the storage.
+///
+/// Create the new storage if the storage of `T` component doesn't
+/// existed.
+///
 /// This function can cause to `panic` due to out of memory
 pub fn setComponent(
     self: *World,
@@ -98,8 +105,10 @@ pub fn setComponent(
     comptime T: type,
     component_value: T,
 ) !void {
-    // get the storage
-    const s = try ErasedComponentStorage.cast(self.*, T);
+    // get the storage or create the new one
+    const s = ErasedComponentStorage
+        .cast(self.*, T) catch
+        self.newComponentStorage(T);
 
     // Append the value of the component to data
     // list in the storage
@@ -138,7 +147,6 @@ test "Init entities" {
 
     var world: World = .init(alloc);
     defer world.deinit();
-    world.newComponentStorage(Position);
 
     const entity_1 = world.newEntity();
     try world.setComponent(entity_1, Position, .{ .x = 5, .y = 6 });
@@ -175,7 +183,6 @@ test "Run systems" {
 
     var world: World = .init(alloc);
     defer world.deinit();
-    world.newComponentStorage(Position);
 
     // Init entity
     const entity_1 = world.newEntity();
@@ -332,9 +339,6 @@ test "get keys of min storage" {
     var w: World = .init(alloc);
     defer w.deinit();
 
-    w.newComponentStorage(Position);
-    w.newComponentStorage(Velocity);
-
     const p1 = w.newEntity();
     try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
     try w.setComponent(p1, Velocity, .{ .x = 1, .y = 2 });
@@ -354,7 +358,6 @@ test "get keys of min storage" {
 
     // add one more component
     const Weapon = struct { name: []const u8 };
-    w.newComponentStorage(Weapon);
     try w.setComponent(p2, Weapon, .{ .name = "sword" });
 
     var k2 = try w.getKeysOfMinStorage(&.{ Position, Velocity, Weapon });
@@ -443,9 +446,6 @@ test "query" {
     const alloc = std.testing.allocator;
     var w: World = .init(alloc);
     defer w.deinit();
-
-    w.newComponentStorage(Position);
-    w.newComponentStorage(Velocity);
 
     const p1 = w.newEntity();
     try w.setComponent(p1, Position, .{ .x = 1, .y = 2 });
