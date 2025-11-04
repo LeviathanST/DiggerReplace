@@ -41,6 +41,9 @@ pub fn init(alloc: std.mem.Allocator) World {
     };
 }
 
+/// Elements will be `deinit` beside the elements of `world`:
+/// - Storages.
+/// - Components in storages which have `deinit()`.
 pub fn deinit(self: *World) void {
     var storage_iter = self.component_storages.iterator();
     while (storage_iter.next()) |entry| {
@@ -85,6 +88,8 @@ pub fn newComponentStorage(
     }) catch @panic("OOM");
 }
 
+/// If a component `type` is reassigned, it will be overwritten
+/// the old value in the storage.
 /// This function can cause to `panic` due to out of memory
 pub fn setComponent(
     self: *World,
@@ -418,7 +423,10 @@ fn tuplesFromTypes(
             if (@typeInfo(T) == .pointer) {
                 tuple[i] = try self.getMutComponent(entity_id, std.meta.Child(T));
             } else {
-                tuple[i] = try self.getComponent(entity_id, T);
+                if (T != EntityID)
+                    tuple[i] = try self.getComponent(entity_id, T)
+                else
+                    tuple[i] = entity_id;
             }
         }
         try tuple_list.append(self.alloc, tuple);
