@@ -4,6 +4,7 @@
 //! * Set, get component by `entity_id`.
 //! * Query entities with specific components.
 const std = @import("std");
+const rl = @import("raylib");
 const component = @import("component.zig");
 
 const ecs_util = @import("util.zig");
@@ -13,7 +14,16 @@ const ComponentStorage = component.Storage;
 const World = @This();
 
 pub const EntityID = usize;
-pub const SystemFn = *const fn (World) anyerror!void;
+pub const System = struct {
+    @"fn": Fn,
+    order: ExecOrder,
+
+    pub const Fn = *const fn (*World) anyerror!void;
+    pub const ExecOrder = enum {
+        startup,
+        update,
+    };
+};
 
 entity_count: usize = 0,
 /// Each storage store data of a component.
@@ -26,7 +36,8 @@ entity_count: usize = 0,
 ///
 /// Get data of a component via `get('name_of_your_component')`
 component_storages: std.AutoHashMap(u64, ErasedComponentStorage),
-systems: std.ArrayList(SystemFn),
+systems: std.ArrayList(System),
+should_exit: bool = false,
 alloc: std.mem.Allocator,
 _arena: *std.heap.ArenaAllocator,
 
@@ -175,13 +186,40 @@ test "Init entities" {
     try std.testing.expect(comp_value_2.y == 6);
 }
 
-pub fn addSystem(self: *World, system: SystemFn) void {
-    self.systems.append(self.alloc, system) catch @panic("OOM");
+pub fn addSystem(self: *World, order: System.ExecOrder, @"fn": System.Fn) *World {
+    self.systems.append(self.alloc, .{
+        .@"fn" = @"fn",
+        .order = order,
+    }) catch @panic("OOM");
+    return self;
 }
 
-pub fn run(self: World) !void {
+pub fn addSystems(
+    self: *World,
+    order: System.ExecOrder,
+    fns: []const System.Fn,
+) *World {
+    for (fns) |f| {
+        _ = self.addSystem(order, f);
+    }
+    return self;
+}
+
+pub fn run(self: *World) !void {
     for (self.systems.items) |system| {
-        try system(self);
+        if (system.order == .startup)
+            try system.@"fn"(self);
+    }
+
+    while (!self.should_exit) {
+        rl.beginDrawing();
+        defer rl.endDrawing();
+
+        for (self.systems.items) |system| {
+            if (system.order == .update)
+                try system.@"fn"(self);
+        }
+        rl.clearBackground(.white);
     }
 }
 
@@ -207,7 +245,7 @@ test "Run systems" {
     //
 
     const move_entity = struct {
-        pub fn move(w: World) !void {
+        pub fn move(w: *World) !void {
             const pos = try w.getMutComponent(0, Position);
 
             pos.x += 1;
@@ -215,7 +253,7 @@ test "Run systems" {
         }
     }.move;
 
-    world.addSystem(move_entity);
+    world.addSystem(.update, move_entity);
     try world.run();
 
     try std.testing.expect(comp_value_1.x == 6);
