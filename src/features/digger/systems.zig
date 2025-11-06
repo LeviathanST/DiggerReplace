@@ -1,24 +1,10 @@
-const std = @import("std");
 const rl = @import("raylib");
-const ecs = @import("ecs.zig");
-const Position = @import("common_types.zig").Position;
-const World = ecs.World;
-const ErasedComponentStorage = ecs.ErasedComponentStorage;
 
-const Grid = @import("common_types.zig").Grid;
-const Digger = @This();
+const World = @import("ecs").World;
+const Position = @import("shared_components").Position;
+const Grid = @import("shared_components").Grid;
 
-pub const InGrid = struct { grid_entity: World.EntityID };
-
-pub fn spawn(w: *World) !void {
-    w.spawnEntity(
-        &.{ Position, InGrid },
-        .{
-            .{ .x = 0, .y = 0 },
-            .{ .grid_entity = 0 },
-        },
-    );
-}
+const InGrid = @import("components.zig").InGrid;
 
 pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) void {
     switch (kinds) {
@@ -61,7 +47,7 @@ pub fn control(w: *World) !void {
 }
 
 /// Draw all diggers
-pub fn draw(w: *World) !void {
+pub fn render(w: *World) !void {
     const queries = try w.query(&.{ Position, InGrid });
 
     for (queries) |query| {

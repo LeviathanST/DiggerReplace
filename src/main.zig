@@ -1,11 +1,15 @@
 const std = @import("std");
 const rl = @import("raylib");
-const common_types = @import("common_types.zig");
-const digger = @import("digger.zig");
-const grid = @import("grid.zig");
+const shared_components = @import("shared_components");
 
-const World = @import("ecs/world.zig");
-const Grid = common_types.Grid;
+const digger_spawn = @import("features/digger/spawn.zig");
+const digger_systems = @import("features/digger/systems.zig");
+
+const area_systems = @import("features/area/systems.zig");
+const area_spawn = @import("features/area/spawn.zig");
+
+const World = @import("ecs").World;
+const Grid = shared_components.Grid;
 
 fn closeWindow(w: *World) !void {
     if (rl.windowShouldClose()) {
@@ -19,11 +23,12 @@ fn loop(alloc: std.mem.Allocator) !void {
 
     rl.setTargetFPS(60);
 
+    // TODO: setup modules
     try world
-        .addSystems(.startup, &.{ grid.spawn, digger.spawn })
+        .addSystems(.startup, &.{ area_spawn.spawn, digger_spawn.spawn })
         .addSystems(.update, &.{closeWindow})
-        .addSystems(.update, &.{grid.draw})
-        .addSystems(.update, &.{ digger.control, digger.draw })
+        .addSystems(.update, &.{area_systems.render})
+        .addSystems(.update, &.{ digger_systems.control, digger_systems.render })
         .run();
 }
 
