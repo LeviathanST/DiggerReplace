@@ -3,6 +3,10 @@
 //! * Lazy init storages.
 //! * Set, get component by `entity_id`.
 //! * Query entities with specific components.
+//! TODO: [ ] Resources
+//!       [ ] Modules (includes systems, resources)
+//!           - References to `Module` in Mach Engine or
+//!           `Plugin` in Bevy.
 const std = @import("std");
 const rl = @import("raylib");
 const component = @import("component.zig");
