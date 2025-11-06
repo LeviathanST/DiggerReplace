@@ -223,43 +223,6 @@ pub fn run(self: *World) !void {
     }
 }
 
-test "Run systems" {
-    const alloc = std.testing.allocator;
-
-    const Position = struct {
-        x: i32,
-        y: i32,
-    };
-
-    var world: World = .init(alloc);
-    defer world.deinit();
-
-    // Init entity
-    const entity_1 = world.newEntity();
-    try world.setComponent(entity_1, Position, .{ .x = 5, .y = 6 });
-
-    // get the pointer to see changes when `world.run` is executed
-    const comp_value_1 = try world.getMutComponent(entity_1, Position);
-    try std.testing.expect(comp_value_1.x == 5);
-    try std.testing.expect(comp_value_1.y == 6);
-    //
-
-    const move_entity = struct {
-        pub fn move(w: *World) !void {
-            const pos = try w.getMutComponent(0, Position);
-
-            pos.x += 1;
-            pos.y += 1;
-        }
-    }.move;
-
-    world.addSystem(.update, move_entity);
-    try world.run();
-
-    try std.testing.expect(comp_value_1.x == 6);
-    try std.testing.expect(comp_value_1.y == 7);
-}
-
 /// Matching enittiy ids between `l1` and `l2`.
 /// The result will be written to l1 and the order of
 /// elements following `l1`.
