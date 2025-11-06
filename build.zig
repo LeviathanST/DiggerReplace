@@ -88,4 +88,22 @@ pub fn build(b: *std.Build) void {
 
         run_ecs_test_step.dependOn(&run_ecs_test.step);
     }
+
+    { // run the shared components test
+        const sc_test_exe = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/shared_components.zig"),
+                .target = t,
+                .optimize = o,
+            }),
+            .test_runner = .{
+                .mode = .simple,
+                .path = b.path("test_runner.zig"),
+            },
+        });
+        const run_sc_test_step = b.step("test-sc", "Run unit tests");
+        const run_sc_test = b.addRunArtifact(sc_test_exe);
+
+        run_sc_test_step.dependOn(&run_sc_test.step);
+    }
 }
