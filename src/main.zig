@@ -7,31 +7,24 @@ const grid = @import("grid.zig");
 const World = @import("ecs/world.zig");
 const Grid = common_types.Grid;
 
+fn closeWindow(w: *World) !void {
+    if (rl.windowShouldClose()) {
+        w.should_exit = true;
+    }
+}
+
 fn loop(alloc: std.mem.Allocator) !void {
     var world: World = .init(alloc);
     defer world.deinit();
 
-    const g = world.newEntity();
-    try world.setComponent(g, Grid, .init(world.alloc, 3, 3, 100, 5));
-    world.addSystem(grid.draw);
-
-    // Digger entity
-    const d = world.newEntity();
-    try world.setComponent(d, common_types.Position, .{ .x = 0, .y = 0 });
-    try world.setComponent(d, digger.InGrid, .{ .grid_entity = g });
-
-    world.addSystem(digger.control);
-    world.addSystem(digger.draw);
-    //
-
     rl.setTargetFPS(60);
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
 
-        try world.run();
-        rl.clearBackground(.white);
-    }
+    try world
+        .addSystems(.startup, &.{ grid.spawn, digger.spawn })
+        .addSystems(.update, &.{closeWindow})
+        .addSystems(.update, &.{grid.draw})
+        .addSystems(.update, &.{ digger.control, digger.draw })
+        .run();
 }
 
 pub fn main() !void {

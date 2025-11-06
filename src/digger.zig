@@ -10,6 +10,16 @@ const Digger = @This();
 
 pub const InGrid = struct { grid_entity: World.EntityID };
 
+pub fn spawn(w: *World) !void {
+    w.spawnEntity(
+        &.{ Position, InGrid },
+        .{
+            .{ .x = 0, .y = 0 },
+            .{ .grid_entity = 0 },
+        },
+    );
+}
+
 pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) void {
     switch (kinds) {
         .up => {
@@ -32,7 +42,7 @@ pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) v
 }
 
 /// move the first digger
-pub fn control(w: World) !void {
+pub fn control(w: *World) !void {
     const pos, const in_grid = (try w.query(&.{ *Position, InGrid }))[0];
     const grid = try w.getComponent(in_grid.grid_entity, Grid);
 
@@ -51,7 +61,7 @@ pub fn control(w: World) !void {
 }
 
 /// Draw all diggers
-pub fn draw(w: World) !void {
+pub fn draw(w: *World) !void {
     const queries = try w.query(&.{ Position, InGrid });
 
     for (queries) |query| {
