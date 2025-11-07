@@ -1,4 +1,4 @@
-// TODO: this module should be a resource
+const std = @import("std");
 const rl = @import("raylib");
 const Config = @This();
 
@@ -13,6 +13,8 @@ pub fn getMainFont(self: *Config) !rl.Font {
     return self.main_font.?;
 }
 
-pub fn deinit(self: Config) void {
-    self.main_font.?.unload();
+pub fn deinit(self: Config, _: std.mem.Allocator) void {
+    if (self.main_font) |f| {
+        f.unload();
+    }
 }

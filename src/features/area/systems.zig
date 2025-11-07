@@ -1,10 +1,14 @@
 const rl = @import("raylib");
 
+const GameAssets = @import("../../GameAssets.zig");
 const World = @import("ecs").World;
 const Grid = @import("shared_components").Grid;
 
 pub fn render(w: *World) !void {
+    const assets = try w.getMutResource(GameAssets);
     const queries = try w.query(&.{Grid});
+    const font = try assets.getMainFont();
+
     for (queries) |query| {
         const grid = query[0]; // get "grid" field
 
@@ -17,11 +21,15 @@ pub fn render(w: *World) !void {
                 .blue,
             );
 
-            rl.drawText(
+            rl.drawTextEx(
+                font,
                 rl.textFormat("%d", .{i}),
-                cell.x + @divTrunc(cell.width, 2) - 5,
-                cell.y + @divTrunc(cell.width, 2) - 5,
-                10,
+                .{
+                    .x = @floatFromInt(cell.x + @divTrunc(cell.width, 2) - 5),
+                    .y = @floatFromInt(cell.y + @divTrunc(cell.width, 2) - 5),
+                },
+                @floatFromInt(font.baseSize - 9),
+                0,
                 .white,
             );
         }

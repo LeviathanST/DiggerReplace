@@ -11,6 +11,8 @@ const area_spawn = @import("features/area/spawn.zig");
 const World = @import("ecs").World;
 const Grid = shared_components.Grid;
 
+const GameAssets = @import("GameAssets.zig");
+
 fn closeWindow(w: *World) !void {
     if (rl.windowShouldClose()) {
         w.should_exit = true;
@@ -25,6 +27,7 @@ fn loop(alloc: std.mem.Allocator) !void {
 
     // TODO: setup modules
     try world
+        .addResource(GameAssets, .{})
         .addSystems(.startup, &.{ area_spawn.spawn, digger_spawn.spawn })
         .addSystems(.update, &.{closeWindow})
         .addSystems(.update, &.{area_systems.render})
