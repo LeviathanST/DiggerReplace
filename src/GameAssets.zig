@@ -1,3 +1,4 @@
+// TODO: this module should be a resource
 const rl = @import("raylib");
 const Config = @This();
 
