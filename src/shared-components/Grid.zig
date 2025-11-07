@@ -16,19 +16,13 @@
 //!     + `E(1, 2)` = 6
 //!
 //! - **Symbol:** `I(E(r, c))` is the actual index of `E(0, 0)` in the grid.
-
 const std = @import("std");
-const rl = @import("raylib");
 
-const Config = @import("Config.zig");
 const Grid = @This();
 
 matrix: []Cell,
 num_of_cols: i32,
 num_of_rows: i32,
-alloc: std.mem.Allocator,
-_config: Config,
-_arena: *std.heap.ArenaAllocator,
 
 pub const Error = error{
     OverNumRow,
@@ -63,14 +57,8 @@ pub fn init(
     cell_width: i32,
     // the space between cells
     cell_gap: i32,
-) !Grid {
-    var aa = alloc.create(std.heap.ArenaAllocator) catch @panic("OOM");
-    errdefer alloc.destroy(aa);
-    aa.* = std.heap.ArenaAllocator.init(alloc);
-    errdefer aa.deinit();
-
-    const allocator = aa.allocator();
-    const matrix = allocator.alloc(Cell, @intCast(num_of_rows * num_of_cols)) catch @panic("OOM");
+) Grid {
+    const matrix = alloc.alloc(Cell, @intCast(num_of_rows * num_of_cols)) catch @panic("OOM");
 
     for (0..@intCast(num_of_rows)) |r| {
         for (0..@intCast(num_of_cols)) |c| {
@@ -84,20 +72,13 @@ pub fn init(
 
     return .{
         .matrix = matrix,
-        .alloc = allocator,
         .num_of_rows = num_of_rows,
         .num_of_cols = num_of_cols,
-        ._arena = aa,
-        ._config = .{},
     };
 }
 
-pub fn deinit(self: *Grid) void {
-    const alloc = self._arena.child_allocator;
-    // self._config.deinit();
-    self.alloc.free(self.matrix);
-    self._arena.deinit();
-    alloc.destroy(self._arena);
+pub fn deinit(self: *Grid, alloc: std.mem.Allocator) void {
+    alloc.free(self.matrix);
 }
 
 /// - Because the matrix is an one dimension array, so the elements can
@@ -149,8 +130,8 @@ pub fn getActualIndex(self: Grid, r: i32, c: i32) !usize {
 
 test "get actual position in the grid" {
     const alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 3, 3, 1, 1);
-    defer grid.deinit();
+    var grid = Grid.init(alloc, 3, 3, 1, 1);
+    defer grid.deinit(alloc);
 
     const pos1 = try grid.getActualIndex(0, 0);
     try std.testing.expect(pos1 == 0);
@@ -170,8 +151,8 @@ test "get actual position in the grid" {
     try std.testing.expectError(Error.OverNumCol, grid.getActualIndex(0, 4));
     try std.testing.expectError(Error.OverNumRow, grid.getActualIndex(4, 0));
 
-    var grid2 = try Grid.init(alloc, 2, 3, 2, 1);
-    defer grid2.deinit();
+    var grid2 = Grid.init(alloc, 2, 3, 2, 1);
+    defer grid2.deinit(alloc);
 
     const pos4 = try grid2.getActualIndex(0, 2);
     try std.testing.expect(pos4 == 2);
@@ -187,27 +168,3 @@ test "get actual position in the grid" {
     try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(3, 4));
 }
 
-pub fn draw(self: *Grid) !void {
-    for (self.matrix, 0..) |cell, i| {
-        rl.drawRectangle(
-            @intCast(cell.x),
-            @intCast(cell.y),
-            @intCast(cell.width),
-            @intCast(cell.width),
-            .blue,
-        );
-
-        const main_font = try self._config.getMainFont();
-        rl.drawTextEx(
-            main_font,
-            rl.textFormat("%d", .{i}),
-            .{
-                .x = @floatFromInt(cell.x + @divTrunc(cell.width, 2) - 5),
-                .y = @floatFromInt(cell.y + @divTrunc(cell.width, 2) - 5),
-            },
-            @as(f32, @floatFromInt(main_font.baseSize)) / 1.5,
-            1,
-            .white,
-        );
-    }
-}

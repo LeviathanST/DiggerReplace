@@ -1,22 +1,32 @@
 const std = @import("std");
 const rl = @import("raylib");
+const shared_components = @import("shared_components");
 
-const Grid = @import("Grid.zig");
-const Digger = @import("Digger.zig");
+const digger_mod = @import("features/digger/mod.zig");
+const area_mod = @import("features/area/mod.zig");
 
-pub fn control(d: *Digger) void {
-    if (rl.isKeyPressed(.j) or rl.isKeyPressed(.down)) {
-        d.move(.down);
+const World = @import("ecs").World;
+const Grid = shared_components.Grid;
+
+const GameAssets = @import("GameAssets.zig");
+
+fn closeWindow(w: *World) !void {
+    if (rl.windowShouldClose()) {
+        w.should_exit = true;
     }
-    if (rl.isKeyPressed(.k) or rl.isKeyPressed(.up)) {
-        d.move(.up);
-    }
-    if (rl.isKeyPressed(.h) or rl.isKeyPressed(.left)) {
-        d.move(.left);
-    }
-    if (rl.isKeyPressed(.l) or rl.isKeyPressed(.right)) {
-        d.move(.right);
-    }
+}
+
+fn loop(alloc: std.mem.Allocator) !void {
+    var world: World = .init(alloc);
+    defer world.deinit();
+
+    rl.setTargetFPS(60);
+
+    try world
+        .addResource(GameAssets, .{})
+        .addSystems(.update, &.{closeWindow})
+        .addModules(&.{ area_mod, digger_mod })
+        .run();
 }
 
 pub fn main() !void {
@@ -32,24 +42,7 @@ pub fn main() !void {
     rl.initWindow(screenWidth, screenHeight, "Digger Replace");
     defer rl.closeWindow();
 
-    var grid = try Grid.init(alloc, 4, 3, 100, 1);
-    defer grid.deinit();
-
-    var digger = try Digger.init(0, 0, grid);
-
-    rl.setTargetFPS(60);
-
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
-
-        try grid.draw();
-        try digger.draw();
-
-        control(&digger);
-
-        rl.clearBackground(.white);
-    }
+    try loop(alloc);
 }
 
 test {

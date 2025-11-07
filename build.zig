@@ -12,6 +12,21 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
 
+    const shared_components_mod = b.addModule("shared_components", .{
+        .root_source_file = b.path("src/shared_components.zig"),
+        .target = t,
+        .optimize = o,
+    });
+
+    const ecs_mod = b.addModule("ecs", .{
+        .root_source_file = b.path("src/ecs.zig"),
+        .target = t,
+        .optimize = o,
+        .imports = &.{
+            .{ .name = "raylib", .module = raylib },
+        },
+    });
+
     {
         const exe = b.addExecutable(.{
             .name = "digger_replace",
@@ -21,6 +36,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = o,
             }),
         });
+        exe.root_module.addImport("shared_components", shared_components_mod);
+        exe.root_module.addImport("ecs", ecs_mod);
         b.installArtifact(exe);
 
         const run_step = b.step("run", "Run the application");
@@ -30,7 +47,7 @@ pub fn build(b: *std.Build) void {
         run_step.dependOn(&run_exe.step);
     }
 
-    {
+    { // run the main test
         const test_exe = b.addTest(.{
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main.zig"),
@@ -42,10 +59,51 @@ pub fn build(b: *std.Build) void {
                 .path = b.path("test_runner.zig"),
             },
         });
-        const run_test_step = b.step("test", "Run unit tests");
+        const run_test_step = b.step("test-main", "Run unit tests");
         const run_test = b.addRunArtifact(test_exe);
         test_exe.linkLibrary(raylib_artifact);
         test_exe.root_module.addImport("raylib", raylib);
+
+        test_exe.root_module.addImport("shared_components", shared_components_mod);
+        test_exe.root_module.addImport("ecs", ecs_mod);
         run_test_step.dependOn(&run_test.step);
+    }
+
+    { // run the ecs test
+        const ecs_test_exe = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/ecs.zig"),
+                .target = t,
+                .optimize = o,
+            }),
+            .test_runner = .{
+                .mode = .simple,
+                .path = b.path("test_runner.zig"),
+            },
+        });
+        const run_ecs_test_step = b.step("test-ecs", "Run unit tests");
+        const run_ecs_test = b.addRunArtifact(ecs_test_exe);
+        ecs_test_exe.linkLibrary(raylib_artifact);
+        ecs_test_exe.root_module.addImport("raylib", raylib);
+
+        run_ecs_test_step.dependOn(&run_ecs_test.step);
+    }
+
+    { // run the shared components test
+        const sc_test_exe = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/shared_components.zig"),
+                .target = t,
+                .optimize = o,
+            }),
+            .test_runner = .{
+                .mode = .simple,
+                .path = b.path("test_runner.zig"),
+            },
+        });
+        const run_sc_test_step = b.step("test-sc", "Run unit tests");
+        const run_sc_test = b.addRunArtifact(sc_test_exe);
+
+        run_sc_test_step.dependOn(&run_sc_test.step);
     }
 }
