@@ -31,6 +31,11 @@ pub const System = struct {
     };
 };
 
+// TODO: add docs
+pub const Module = struct {
+    build_fn: *const fn (*World) void,
+};
+
 entity_count: usize = 0,
 /// Each storage store data of a component.
 /// # Example:
@@ -277,6 +282,22 @@ pub fn addSystems(
         _ = self.addSystem(order, f);
     }
     return self;
+}
+
+pub fn addModules(self: *World, comptime types: []const type) *World {
+    inline for (types) |T| {
+        self.addModule(T);
+    }
+    return self;
+}
+
+pub fn addModule(self: *World, comptime T: type) void {
+    std.log.debug("Add module - {s}", .{@typeName(T)});
+    if (std.meta.hasFn(T, "build")) {
+        T.build(self);
+    } else {
+        @panic("The module `{s}` doesn't have the `build` function!");
+    }
 }
 
 pub fn run(self: *World) !void {
