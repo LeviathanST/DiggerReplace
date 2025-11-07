@@ -2,11 +2,8 @@ const std = @import("std");
 const rl = @import("raylib");
 const shared_components = @import("shared_components");
 
-const digger_spawn = @import("features/digger/spawn.zig");
-const digger_systems = @import("features/digger/systems.zig");
-
-const area_systems = @import("features/area/systems.zig");
-const area_spawn = @import("features/area/spawn.zig");
+const digger_mod = @import("features/digger/mod.zig");
+const area_mod = @import("features/area/mod.zig");
 
 const World = @import("ecs").World;
 const Grid = shared_components.Grid;
@@ -25,13 +22,10 @@ fn loop(alloc: std.mem.Allocator) !void {
 
     rl.setTargetFPS(60);
 
-    // TODO: setup modules
     try world
         .addResource(GameAssets, .{})
-        .addSystems(.startup, &.{ area_spawn.spawn, digger_spawn.spawn })
         .addSystems(.update, &.{closeWindow})
-        .addSystems(.update, &.{area_systems.render})
-        .addSystems(.update, &.{ digger_systems.control, digger_systems.render })
+        .addModules(&.{ area_mod, digger_mod })
         .run();
 }
 
