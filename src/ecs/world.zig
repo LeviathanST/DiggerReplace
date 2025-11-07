@@ -3,18 +3,20 @@
 //! * Lazy init storages.
 //! * Set, get component by `entity_id`.
 //! * Query entities with specific components.
-//! TODO: [ ] Resources
-//!       [ ] Modules (includes systems, resources)
+//! TODO: [ ] Modules (includes systems, resources)
 //!           - References to `Module` in Mach Engine or
 //!           `Plugin` in Bevy.
 const std = @import("std");
 const rl = @import("raylib");
 const component = @import("component.zig");
+const resource = @import("resource.zig");
 
 const ecs_util = @import("util.zig");
 
 const ErasedComponentStorage = component.ErasedStorage;
 const ComponentStorage = component.Storage;
+const ErasedResourceType = resource.ErasedResource;
+
 const World = @This();
 
 pub const EntityID = usize;
@@ -41,6 +43,7 @@ entity_count: usize = 0,
 /// Get data of a component via `get('name_of_your_component')`
 component_storages: std.AutoHashMap(u64, ErasedComponentStorage),
 systems: std.ArrayList(System),
+resources: std.AutoHashMap(u64, ErasedResourceType),
 should_exit: bool = false,
 alloc: std.mem.Allocator,
 _arena: *std.heap.ArenaAllocator,
@@ -53,6 +56,7 @@ pub fn init(alloc: std.mem.Allocator) World {
         .alloc = arena.allocator(),
         .component_storages = .init(alloc),
         .systems = .empty,
+        .resources = .init(alloc),
         ._arena = arena,
     };
 }
@@ -66,7 +70,13 @@ pub fn deinit(self: *World) void {
         entry.value_ptr.*.deinit_fn(self.*, self.alloc);
     }
 
+    var resource_iter = self.resources.iterator();
+    while (resource_iter.next()) |entry| {
+        entry.value_ptr.*.deinit_fn(self.*, self.alloc);
+    }
+
     self.component_storages.deinit();
+    self.resources.deinit();
     self.systems.deinit(self.alloc);
 
     self._arena.deinit();
@@ -89,6 +99,66 @@ pub fn spawnEntity(
     inline for (types, 0..) |T, i| {
         try self.setComponent(id, T, values[i]);
     }
+}
+
+pub fn addResource(self: *World, comptime T: type, value: T) *World {
+    self.setResource(T, value);
+    return self;
+}
+
+/// This function can cause to `panic` due to out of memory
+pub fn setResource(self: *World, comptime T: type, value: T) void {
+    const resource_ptr = self.alloc.create(T) catch @panic("OOM");
+    resource_ptr.* = value;
+
+    const hash = std.hash_map.hashString(@typeName(T));
+    self.resources.put(hash, .{
+        .ptr = resource_ptr,
+        .deinit_fn = struct {
+            pub fn deinit(w: World, alloc: std.mem.Allocator) void {
+                const ptr = ErasedResourceType.cast(w, T) catch unreachable;
+                if (std.meta.hasFn(T, "deinit")) {
+                    ptr.deinit(alloc);
+                }
+            }
+        }.deinit,
+    }) catch @panic("OOM");
+}
+
+pub fn getResource(self: World, comptime T: type) !T {
+    return (try ErasedResourceType.cast(self, T)).*;
+}
+
+pub fn getMutResource(self: World, comptime T: type) !*T {
+    return ErasedResourceType.cast(self, T);
+}
+
+test "set & get resource" {
+    const Settings = struct {
+        music_volume: u8 = 100,
+    };
+
+    const App = struct {
+        state: enum { start, running, stop } = .start,
+    };
+
+    const alloc = std.testing.allocator;
+    var w: World = .init(alloc);
+    defer w.deinit();
+
+    _ = w
+        .addResource(Settings, .{})
+        .addResource(App, .{});
+
+    const immutable_settings = try w.getResource(Settings);
+    try std.testing.expectEqual(100, immutable_settings.music_volume);
+
+    const mutable_app = try w.getMutResource(App);
+    try std.testing.expectEqual(.start, mutable_app.state);
+    mutable_app.*.state = .running;
+    try std.testing.expectEqual(.running, mutable_app.state);
+    mutable_app.*.state = .stop;
+    try std.testing.expectEqual(.stop, mutable_app.state);
 }
 
 /// Create a new component `T` storage with `name`.
