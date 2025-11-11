@@ -1,3 +1,4 @@
+const std = @import("std");
 const systems = @import("systems.zig");
 
 const World = @import("ecs").World;
@@ -9,7 +10,7 @@ pub fn build(w: *World) void {
         .addSystems(.update, &.{systems.render});
 }
 
-pub fn spawn(w: *World) !void {
+pub fn spawn(w: *World, _: std.mem.Allocator) !void {
     w.spawnEntity(
         &.{Grid},
         .{.init(w.alloc, 3, 3, 100, 5)},

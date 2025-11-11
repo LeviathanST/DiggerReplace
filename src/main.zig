@@ -10,7 +10,7 @@ const Grid = shared_components.Grid;
 
 const GameAssets = @import("GameAssets.zig");
 
-fn closeWindow(w: *World) !void {
+fn closeWindow(w: *World, _: std.mem.Allocator) !void {
     if (rl.windowShouldClose()) {
         w.should_exit = true;
     }

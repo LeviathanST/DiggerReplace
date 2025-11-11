@@ -1,3 +1,4 @@
+const std = @import("std");
 const rl = @import("raylib");
 
 const World = @import("ecs").World;
@@ -28,7 +29,7 @@ pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) v
 }
 
 /// move the first digger
-pub fn control(w: *World) !void {
+pub fn control(w: *World, _: std.mem.Allocator) !void {
     const pos, const in_grid = (try w.query(&.{ *Position, InGrid }))[0];
     const grid = try w.getComponent(in_grid.grid_entity, Grid);
 
@@ -47,7 +48,7 @@ pub fn control(w: *World) !void {
 }
 
 /// Draw all diggers
-pub fn render(w: *World) !void {
+pub fn render(w: *World, _: std.mem.Allocator) !void {
     const queries = try w.query(&.{ Position, InGrid });
 
     for (queries) |query| {

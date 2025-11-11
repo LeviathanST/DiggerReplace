@@ -1,10 +1,11 @@
+const std = @import("std");
 const rl = @import("raylib");
 
 const GameAssets = @import("../../GameAssets.zig");
 const World = @import("ecs").World;
 const Grid = @import("shared_components").Grid;
 
-pub fn render(w: *World) !void {
+pub fn render(w: *World, _: std.mem.Allocator) !void {
     const assets = try w.getMutResource(GameAssets);
     const queries = try w.query(&.{Grid});
     const font = try assets.getMainFont();
