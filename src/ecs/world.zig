@@ -55,11 +55,14 @@ resources: std.AutoHashMap(u64, ErasedResourceType),
 should_exit: bool = false,
 /// The `long-live` allocator.
 /// All things are allocated by this will persist until
-/// the application terminates (in `world.deinit()`).
+/// the application terminates (in `world.deinit()`) or
+/// freed manual allocations during application.
 alloc: std.mem.Allocator,
 /// The `short-live` allocator, per-frame allocations.
 /// Should be used in `systems` to allocate each frame, and all
 /// allocations are freed in bulk at frame end.
+///
+/// This allocator will be passed to the `systems` as a parameter.
 arena: *std.heap.ArenaAllocator,
 
 /// This function can cause to `panic` due to out of memory

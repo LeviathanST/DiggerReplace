@@ -1,3 +1,4 @@
+const std = @import("std");
 const systems = @import("systems.zig");
 
 const Position = @import("shared_components").Position;
@@ -14,7 +15,7 @@ pub fn build(w: *World) void {
     });
 }
 
-pub fn spawn(w: *World) !void {
+pub fn spawn(w: *World, _: std.mem.Allocator) !void {
     w.spawnEntity(
         &.{ Position, InGrid },
         .{
