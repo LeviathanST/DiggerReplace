@@ -24,7 +24,12 @@ pub const System = struct {
     @"fn": Fn,
     order: ExecOrder,
 
-    pub const Fn = *const fn (*World) anyerror!void;
+    // TODO: make all args optional? I think the idea same with the dependency injection
+    //      ex: aRandomSystemFn() -> fetch nothing
+    //          aRandomSystemFn(allocator) -> just fetch allocator
+    //          aRandomSystemFn(allocator, query_result) -> fetch allocator & query result
+    //          aRandomSystemFn(allocator, resources) -> fetch allocator & resources
+    pub const Fn = *const fn (*World, std.mem.Allocator) anyerror!void;
     pub const ExecOrder = enum {
         startup,
         update,
@@ -44,30 +49,37 @@ entity_count: usize = 0,
 /// |------------|   |------------|
 /// |x: 15, y: 2 |   |x: 15, y: 2 |
 /// |------------|   |------------|
-///
-/// Get data of a component via `get('name_of_your_component')`
 component_storages: std.AutoHashMap(u64, ErasedComponentStorage),
 systems: std.ArrayList(System),
 resources: std.AutoHashMap(u64, ErasedResourceType),
 should_exit: bool = false,
+/// The `long-live` allocator.
+/// All things are allocated by this will persist until
+/// the application terminates (in `world.deinit()`).
 alloc: std.mem.Allocator,
-_arena: *std.heap.ArenaAllocator,
+/// The `short-live` allocator, per-frame allocations.
+/// Should be used in `systems` to allocate each frame, and all
+/// allocations are freed in bulk at frame end.
+arena: *std.heap.ArenaAllocator,
 
 /// This function can cause to `panic` due to out of memory
 pub fn init(alloc: std.mem.Allocator) World {
     const arena = alloc.create(std.heap.ArenaAllocator) catch @panic("OOM");
     arena.* = .init(alloc);
+
     return .{
-        .alloc = arena.allocator(),
+        .arena = arena,
+        .alloc = alloc,
         .component_storages = .init(alloc),
         .systems = .empty,
         .resources = .init(alloc),
-        ._arena = arena,
     };
 }
 
-/// Elements will be `deinit` beside the elements of `world`:
-/// - Storages.
+/// Elements will be `deinit`:
+/// - Component storages.
+/// - Resources.
+/// - List of `systems`.
 /// - Components in storages which have `deinit()`.
 pub fn deinit(self: *World) void {
     var storage_iter = self.component_storages.iterator();
@@ -84,8 +96,8 @@ pub fn deinit(self: *World) void {
     self.resources.deinit();
     self.systems.deinit(self.alloc);
 
-    self._arena.deinit();
-    self._arena.child_allocator.destroy(self._arena);
+    self.arena.deinit();
+    self.alloc.destroy(self.arena);
 }
 
 pub fn newEntity(self: *World) EntityID {
@@ -125,6 +137,7 @@ pub fn setResource(self: *World, comptime T: type, value: T) void {
                 if (std.meta.hasFn(T, "deinit")) {
                     ptr.deinit(alloc);
                 }
+                alloc.destroy(ptr);
             }
         }.deinit,
     }) catch @panic("OOM");
@@ -166,7 +179,7 @@ test "set & get resource" {
     try std.testing.expectEqual(.stop, mutable_app.state);
 }
 
-/// Create a new component `T` storage with `name`.
+/// Create a new component `T` storage.
 ///
 /// This function can cause to `panic` due to out of memory
 pub fn newComponentStorage(
@@ -184,8 +197,9 @@ pub fn newComponentStorage(
         .ptr = storage,
         .deinit_fn = struct {
             pub fn deinit(w: World, alloc: std.mem.Allocator) void {
-                const s = ErasedComponentStorage.cast(w, T) catch unreachable;
-                s.deinit(alloc);
+                const ptr = ErasedComponentStorage.cast(w, T) catch unreachable;
+                ptr.deinit(alloc);
+                alloc.destroy(ptr);
             }
         }.deinit,
     }) catch @panic("OOM");
@@ -194,13 +208,13 @@ pub fn newComponentStorage(
     return ErasedComponentStorage.cast(self.*, T) catch unreachable;
 }
 
-/// If a component `type` is reassigned, it will be overwritten
-/// the old value in the storage.
-///
 /// Create the new storage if the storage of `T` component doesn't
 /// existed.
 ///
-/// This function can cause to `panic` due to out of memory
+/// If a component `type` is reassigned, it will be overwritten
+/// the old value in the storage.
+///
+/// This function can cause to `panic` due to out of memory.
 pub fn setComponent(
     self: *World,
     entity_id: EntityID,
@@ -303,7 +317,7 @@ pub fn addModule(self: *World, comptime T: type) void {
 pub fn run(self: *World) !void {
     for (self.systems.items) |system| {
         if (system.order == .startup)
-            try system.@"fn"(self);
+            try system.@"fn"(self, self.arena.allocator());
     }
 
     while (!self.should_exit) {
@@ -312,9 +326,11 @@ pub fn run(self: *World) !void {
 
         for (self.systems.items) |system| {
             if (system.order == .update)
-                try system.@"fn"(self);
+                try system.@"fn"(self, self.arena.allocator());
         }
         rl.clearBackground(.white);
+        // free all things are allocated by `world.arena`
+        _ = self.arena.reset(.free_all);
     }
 }
 
@@ -392,9 +408,8 @@ const KeyMin = struct {
 
 /// Get all keys of a storage in `types`
 /// which has the `fewest` elements.
-///
-/// The caller should call `deinit()` after finish.
 fn getKeysOfMinStorage(self: World, comptime types: []const type) !KeyMin {
+    const alloc = self.arena.allocator();
     // NOTE: always get the first component
     var min: u32 = std.math.maxInt(u32);
     var idx: usize = 0;
@@ -414,7 +429,6 @@ fn getKeysOfMinStorage(self: World, comptime types: []const type) !KeyMin {
     }
 
     var keys_list: std.ArrayList(u64) = .empty;
-    defer keys_list.deinit(self.alloc);
 
     // get the value of min
     inline for (types, 0..) |T, i| {
@@ -426,11 +440,11 @@ fn getKeysOfMinStorage(self: World, comptime types: []const type) !KeyMin {
                 .keyIterator();
 
             while (iter.next()) |it| {
-                try keys_list.append(self.alloc, it.*);
+                try keys_list.append(alloc, it.*);
             }
 
             return .{
-                .items = try keys_list.toOwnedSlice(self.alloc),
+                .items = keys_list.items,
                 .idx = idx,
             };
         }
@@ -461,8 +475,7 @@ test "get keys of min storage" {
         .{ .x = 1, .y = 2 },
     });
 
-    var k1 = try w.getKeysOfMinStorage(&.{ Position, Velocity });
-    defer k1.deinit(w.alloc);
+    const k1 = try w.getKeysOfMinStorage(&.{ Position, Velocity });
 
     try std.testing.expectEqual(1, k1.idx);
     try std.testing.expectEqualSlices(u64, &.{ 1, 0 }, k1.items);
@@ -471,8 +484,7 @@ test "get keys of min storage" {
     const Weapon = struct { name: []const u8 };
     try w.setComponent(1, Weapon, .{ .name = "sword" });
 
-    var k2 = try w.getKeysOfMinStorage(&.{ Position, Velocity, Weapon });
-    defer k2.deinit(w.alloc);
+    const k2 = try w.getKeysOfMinStorage(&.{ Position, Velocity, Weapon });
 
     try std.testing.expectEqual(2, k2.idx);
     try std.testing.expectEqualSlices(u64, &.{1}, k2.items);
@@ -482,23 +494,26 @@ test "get keys of min storage" {
 ///
 /// # Examples:
 /// ```zig
-/// var result = query(&.{Position, Velocity})
+/// var result = try query(&.{Position, Velocity})
 /// for (result) |entity| {
 ///     const pos: Position, const vec: Velocity = entity;
 ///     ...
 /// }
 /// ```
-pub fn query(self: World, comptime types: []const type) ![]std.meta.Tuple(types) {
+///
+/// This function should be used in `systems` (called in every frame),
+/// so we can ensure that all allocated things will be freed at the
+/// end of the frame.
+pub fn query(
+    self: World,
+    comptime types: []const type,
+) ![]std.meta.Tuple(types) {
+    const alloc = self.arena.allocator();
     // The temporarily list to contain entity ids from `types[index]`
     var temp_list: std.ArrayList(EntityID) = .empty;
-    defer temp_list.deinit(self.alloc);
-
-    var min_storage = try self.getKeysOfMinStorage(types);
-    defer min_storage.deinit(self.alloc);
-
+    const min_storage = try self.getKeysOfMinStorage(types);
     // assign the storage which has the fewest elements first
     var result_list: std.ArrayList(EntityID) = .fromOwnedSlice(min_storage.items);
-    defer result_list.deinit(self.alloc);
 
     inline for (types, 0..) |T, i| {
         // use label to control flow in comptime
@@ -512,12 +527,12 @@ pub fn query(self: World, comptime types: []const type) ![]std.meta.Tuple(types)
 
             var data_iter = s.data.keyIterator();
             while (data_iter.next()) |it| {
-                try temp_list.append(self.alloc, it.*);
+                try temp_list.append(alloc, it.*);
             }
-            try findMatch(self.alloc, &result_list, temp_list);
+            try findMatch(alloc, &result_list, temp_list);
 
             // reset l1
-            temp_list.clearAndFree(self.alloc);
+            temp_list.clearAndFree(alloc);
         }
     }
 
@@ -529,8 +544,8 @@ fn tuplesFromTypes(
     entities: []const EntityID,
     comptime types: []const type,
 ) ![]std.meta.Tuple(types) {
+    const alloc = self.arena.allocator();
     var tuple_list: std.ArrayList(std.meta.Tuple(types)) = .empty;
-    defer tuple_list.deinit(self.alloc);
 
     for (entities) |entity_id| {
         var tuple: std.meta.Tuple(types) = undefined;
@@ -544,10 +559,10 @@ fn tuplesFromTypes(
                     tuple[i] = entity_id;
             }
         }
-        try tuple_list.append(self.alloc, tuple);
+        try tuple_list.append(alloc, tuple);
     }
 
-    return tuple_list.toOwnedSlice(self.alloc);
+    return tuple_list.items;
 }
 
 test "query" {
@@ -578,7 +593,6 @@ test "query" {
     });
 
     const queries = try query(w, &.{ Position, *Velocity });
-    defer w.alloc.free(queries);
 
     try std.testing.expect(queries.len == 2);
 
@@ -599,14 +613,12 @@ test "query" {
 
     // get again to see if the value was changed
     const queries2 = try query(w, &.{ Position, Velocity });
-    defer w.alloc.free(queries2);
 
     const pos_2: Position, const vec_2: Velocity = queries2[1];
     try std.testing.expect(pos_2.x == 1);
     try std.testing.expect(vec_2.x == 2);
 
     const player_queries = try query(w, &.{ Player, *Position });
-    defer w.alloc.free(queries);
     try std.testing.expectEqual(1, player_queries.len);
 
     const player, const player_pos = player_queries[0];
