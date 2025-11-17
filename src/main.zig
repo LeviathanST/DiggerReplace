@@ -1,5 +1,6 @@
 const std = @import("std");
 const rl = @import("raylib");
+const mods = @import("ecs").mods;
 const shared_components = @import("shared_components");
 
 const digger_mod = @import("features/digger/mod.zig");
@@ -23,6 +24,7 @@ fn loop(alloc: std.mem.Allocator) !void {
     rl.setTargetFPS(60);
 
     try world
+        .addModules(&.{mods.render})
         .addResource(GameAssets, .{})
         .addSystems(.update, &.{closeWindow})
         .addModules(&.{ area_mod, digger_mod })

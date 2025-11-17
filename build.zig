@@ -12,17 +12,21 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
 
-    const shared_components_mod = b.addModule("shared_components", .{
-        .root_source_file = b.path("src/shared_components.zig"),
-        .target = t,
-        .optimize = o,
-    });
-
     const ecs_mod = b.addModule("ecs", .{
         .root_source_file = b.path("src/ecs.zig"),
         .target = t,
         .optimize = o,
         .imports = &.{
+            .{ .name = "raylib", .module = raylib },
+        },
+    });
+
+    const shared_components_mod = b.addModule("shared_components", .{
+        .root_source_file = b.path("src/shared_components.zig"),
+        .target = t,
+        .optimize = o,
+        .imports = &.{
+            .{ .name = "ecs", .module = ecs_mod },
             .{ .name = "raylib", .module = raylib },
         },
     });

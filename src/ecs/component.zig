@@ -1,5 +1,5 @@
 const std = @import("std");
-const World = @import("world.zig");
+const World = @import("World.zig");
 const ecs_util = @import("util.zig");
 const EntityID = World.EntityID;
 

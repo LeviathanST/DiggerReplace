@@ -17,6 +17,7 @@
 //!
 //! - **Symbol:** `I(E(r, c))` is the actual index of `E(0, 0)` in the grid.
 const std = @import("std");
+const rl = @import("raylib");
 
 const Grid = @This();
 
@@ -37,6 +38,7 @@ pub const Cell = struct {
     /// row_idx * (cell_width + cell_gap)
     y: i32,
     width: i32,
+    color: rl.Color,
 };
 
 /// Create a grid (1 dimension array) with `num_of_rows` * `num_of_cols` cells.
@@ -55,6 +57,7 @@ pub fn init(
     num_of_rows: i32,
     num_of_cols: i32,
     cell_width: i32,
+    cell_color: rl.Color,
     // the space between cells
     cell_gap: i32,
 ) Grid {
@@ -66,6 +69,7 @@ pub fn init(
                 .x = @as(i32, @intCast((c))) * (cell_width + cell_gap),
                 .y = @as(i32, @intCast((r))) * (cell_width + cell_gap),
                 .width = cell_width,
+                .color = cell_color,
             };
         }
     }
@@ -168,3 +172,19 @@ test "get actual position in the grid" {
     try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(3, 4));
 }
 
+pub fn render(w: *@import("ecs").World, _: std.mem.Allocator) !void {
+    const queries = try w.query(&.{Grid});
+    for (queries) |query| {
+        const grid = query[0]; // get "grid" field
+
+        for (grid.matrix) |cell| {
+            rl.drawRectangle(
+                @intCast(cell.x),
+                @intCast(cell.y),
+                @intCast(cell.width),
+                @intCast(cell.width),
+                cell.color,
+            );
+        }
+    }
+}
