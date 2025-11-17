@@ -238,6 +238,7 @@ pub fn setComponent(
     ) catch @panic("OOM");
 
     // Use `render` module to enable this feature.
+    // TODO: Does this feat only work when enabled by the user?
     if (std.meta.hasFn(T, "render")) {
         try self.setComponent(
             entity_id,
