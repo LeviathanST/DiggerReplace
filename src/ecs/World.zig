@@ -146,6 +146,10 @@ pub fn setResource(self: *World, comptime T: type, value: T) void {
     }) catch @panic("OOM");
 }
 
+pub const GetResourceError = error{
+    /// `T` resource not found.
+    ValueNotFound,
+};
 pub fn getResource(self: World, comptime T: type) !T {
     return (try ErasedResourceType.cast(self, T)).*;
 }
@@ -237,14 +241,19 @@ pub fn setComponent(
         component_value,
     ) catch @panic("OOM");
 }
-
+pub const GetComponentError = error{
+    /// The storage of `T` component not found.
+    StorageNotFound,
+    /// `T` component of a specified entity not found.
+    ValueNotFound,
+};
 pub fn getComponent(
     self: World,
     entity_id: EntityID,
     comptime T: type,
 ) !T {
     const s = try ErasedComponentStorage.cast(self, T);
-    return s.data.get(entity_id) orelse error.ComponentValueNotFound;
+    return s.data.get(entity_id) orelse GetComponentError.ValueNotFound;
 }
 
 pub fn getMutComponent(
@@ -253,7 +262,7 @@ pub fn getMutComponent(
     comptime T: type,
 ) !*T {
     const s = try ErasedComponentStorage.cast(self, T);
-    return s.data.getPtr(entity_id) orelse error.ComponentValueNotFound;
+    return s.data.getPtr(entity_id) orelse GetComponentError.ValueNotFound;
 }
 
 test "Init entities" {

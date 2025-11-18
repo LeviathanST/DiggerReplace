@@ -7,7 +7,7 @@ pub const ErasedResource = struct {
 
     pub inline fn cast(w: World, comptime T: type) !*T {
         const hash = std.hash_map.hashString(@typeName(T));
-        const value = w.resources.get(hash) orelse return error.ResourceNotFound;
+        const value = w.resources.get(hash) orelse return World.GetResourceError.ValueNotFound;
         return @ptrCast(@alignCast(value.ptr));
     }
 };
