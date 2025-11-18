@@ -301,7 +301,7 @@ fn renderGridLine(grid: Grid) void {
             grid.matrix[idx_x1].y,
             grid.matrix[idx_y1].x,
             grid.matrix[idx_y1].y,
-            .red,
+            grid.color,
         );
     }
 
@@ -315,7 +315,7 @@ fn renderGridLine(grid: Grid) void {
             grid.matrix[idx_x1].y,
             grid.matrix[idx_y1].x,
             grid.matrix[idx_y1].y,
-            .red,
+            grid.color,
         );
     }
 }
