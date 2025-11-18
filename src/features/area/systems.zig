@@ -3,7 +3,7 @@ const rl = @import("raylib");
 
 const GameAssets = @import("../../GameAssets.zig");
 const World = @import("ecs").World;
-const Grid = @import("shared_components").Grid;
+const Grid = @import("components.zig").Grid;
 
 pub fn render(w: *World, _: std.mem.Allocator) !void {
     const assets = try w.getMutResource(GameAssets);

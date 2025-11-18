@@ -2,7 +2,7 @@ const std = @import("std");
 const systems = @import("systems.zig");
 
 const World = @import("ecs").World;
-const Grid = @import("shared_components").Grid;
+const Grid = @import("components.zig").Grid;
 
 pub fn build(w: *World) void {
     _ = w

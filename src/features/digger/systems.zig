@@ -2,9 +2,9 @@ const std = @import("std");
 const rl = @import("raylib");
 
 const World = @import("ecs").World;
-const Position = @import("shared_components").Position;
-const Grid = @import("shared_components").Grid;
+const Position = @import("ecs").common.Position;
 
+const Grid = @import("../area/components.zig").Grid;
 const InGrid = @import("components.zig").InGrid;
 
 pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) void {
