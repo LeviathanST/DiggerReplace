@@ -1,7 +1,7 @@
 const std = @import("std");
 const systems = @import("systems.zig");
 
-const Position = @import("shared_components").Position;
+const Position = @import("ecs").common.Position;
 const World = @import("ecs").World;
 
 const InGrid = @import("components.zig").InGrid;

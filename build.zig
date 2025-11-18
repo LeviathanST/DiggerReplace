@@ -12,12 +12,6 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
 
-    const shared_components_mod = b.addModule("shared_components", .{
-        .root_source_file = b.path("src/shared_components.zig"),
-        .target = t,
-        .optimize = o,
-    });
-
     const ecs_mod = b.addModule("ecs", .{
         .root_source_file = b.path("src/ecs.zig"),
         .target = t,
@@ -36,7 +30,6 @@ pub fn build(b: *std.Build) void {
                 .optimize = o,
             }),
         });
-        exe.root_module.addImport("shared_components", shared_components_mod);
         exe.root_module.addImport("ecs", ecs_mod);
         b.installArtifact(exe);
 
@@ -64,7 +57,6 @@ pub fn build(b: *std.Build) void {
         test_exe.linkLibrary(raylib_artifact);
         test_exe.root_module.addImport("raylib", raylib);
 
-        test_exe.root_module.addImport("shared_components", shared_components_mod);
         test_exe.root_module.addImport("ecs", ecs_mod);
         run_test_step.dependOn(&run_test.step);
     }
@@ -87,23 +79,5 @@ pub fn build(b: *std.Build) void {
         ecs_test_exe.root_module.addImport("raylib", raylib);
 
         run_ecs_test_step.dependOn(&run_ecs_test.step);
-    }
-
-    { // run the shared components test
-        const sc_test_exe = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/shared_components.zig"),
-                .target = t,
-                .optimize = o,
-            }),
-            .test_runner = .{
-                .mode = .simple,
-                .path = b.path("test_runner.zig"),
-            },
-        });
-        const run_sc_test_step = b.step("test-sc", "Run unit tests");
-        const run_sc_test = b.addRunArtifact(sc_test_exe);
-
-        run_sc_test_step.dependOn(&run_sc_test.step);
     }
 }
