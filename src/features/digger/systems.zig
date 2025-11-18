@@ -3,12 +3,14 @@ const rl = @import("raylib");
 
 const World = @import("ecs").World;
 const Position = @import("ecs").common.Position;
+const Grid = @import("ecs").common.Grid;
 
-const Grid = @import("../area/components.zig").Grid;
 const InGrid = @import("components.zig").InGrid;
 
-pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) void {
-    switch (kinds) {
+const MoveDirection = enum { up, down, left, right };
+
+pub fn move(pos: *Position, grid: Grid, direction: MoveDirection) void {
+    switch (direction) {
         .up => {
             if (pos.x - 1 >= 0)
                 pos.x -= 1;
@@ -29,22 +31,11 @@ pub fn move(pos: *Position, grid: Grid, kinds: enum { up, down, left, right }) v
 }
 
 /// move the first digger
-pub fn control(w: *World, _: std.mem.Allocator) !void {
+pub fn control(w: *World, move_direction: MoveDirection) !void {
     const pos, const in_grid = (try w.query(&.{ *Position, InGrid }))[0];
     const grid = try w.getComponent(in_grid.grid_entity, Grid);
 
-    if (rl.isKeyPressed(.j) or rl.isKeyPressed(.down)) {
-        move(pos, grid, .down);
-    }
-    if (rl.isKeyPressed(.k) or rl.isKeyPressed(.up)) {
-        move(pos, grid, .up);
-    }
-    if (rl.isKeyPressed(.h) or rl.isKeyPressed(.left)) {
-        move(pos, grid, .left);
-    }
-    if (rl.isKeyPressed(.l) or rl.isKeyPressed(.right)) {
-        move(pos, grid, .right);
-    }
+    move(pos, grid, move_direction);
 }
 
 /// Draw all diggers
@@ -56,8 +47,8 @@ pub fn render(w: *World, _: std.mem.Allocator) !void {
         const grid = try w.getComponent(in_grid.grid_entity, Grid);
 
         const pos_in_px = grid.matrix[@intCast(try grid.getActualIndex(pos.x, pos.y))];
-        const pos_x = pos_in_px.x + @divTrunc(pos_in_px.width, 2);
-        const pos_y = pos_in_px.y + @divTrunc(pos_in_px.width, 2);
+        const pos_x = pos_in_px.x + @divTrunc(grid.cell_width, 2);
+        const pos_y = pos_in_px.y + @divTrunc(grid.cell_width, 2);
         rl.drawCircle(pos_x, pos_y, 10, .red);
     }
 }
