@@ -1,5 +1,5 @@
 const std = @import("std");
-const World = @import("World.zig");
+const World = @import("world.zig");
 
 pub const ErasedResource = struct {
     ptr: *anyopaque,
