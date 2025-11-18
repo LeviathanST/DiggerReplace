@@ -71,28 +71,29 @@ pub fn renderButton(w: *World, _: std.mem.Allocator) !void {
     );
 }
 
+/// # Examples:
+/// * rows = 3, cols = 3
+/// |--|--|--|
+/// |1 |2 |3 |
+/// |--|--|--|
+/// |4 |5 |6 |
+/// |--|--|--|
+/// |7 |8 |9 |
+/// |--|--|--|
+///
+/// # Definitions:
+/// - **Symbol:** `E(r, c)` is the element at _r-th_ row, _c-th_ col.
+/// _(i, j are started from 0)_
+///   + ## Examples:
+///     + `E(0, 0)` = 1
+///     + `E(1, 2)` = 6
+///
+/// - **Symbol:** `I(E(r, c))` is the actual index of `E(0, 0)` in the grid.
 // TODO:
 // Grid should only draw lines, not block
 // references to component hierarchy in `Bevy` if want to draw blocks
+
 pub const Grid = struct {
-    /// # Examples:
-    /// * rows = 3, cols = 3
-    /// |--|--|--|
-    /// |1 |2 |3 |
-    /// |--|--|--|
-    /// |4 |5 |6 |
-    /// |--|--|--|
-    /// |7 |8 |9 |
-    /// |--|--|--|
-    ///
-    /// # Definitions:
-    /// - **Symbol:** `E(r, c)` is the element at _r-th_ row, _c-th_ col.
-    /// _(i, j are started from 0)_
-    ///   + ## Examples:
-    ///     + `E(0, 0)` = 1
-    ///     + `E(1, 2)` = 6
-    ///
-    /// - **Symbol:** `I(E(r, c))` is the actual index of `E(0, 0)` in the grid.
     matrix: []Cell,
     num_of_cols: i32,
     num_of_rows: i32,
