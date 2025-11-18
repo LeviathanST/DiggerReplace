@@ -98,8 +98,15 @@ pub const Grid = struct {
     num_of_cols: i32,
     num_of_rows: i32,
     cell_width: i32,
-    cell_color: rl.Color,
+    cell_height: i32,
+    /// * color of:
+    /// + *lines* if `render_mode` is `.line`
+    /// + *blocks* if `render_mode` is `.block`
+    color: rl.Color,
     cell_gap: i32,
+    render_mode: RenderMode,
+
+    const RenderMode = enum { line, block, none };
 
     pub const Error = error{
         OverNumRow,
@@ -133,9 +140,11 @@ pub const Grid = struct {
         num_of_rows: i32,
         num_of_cols: i32,
         cell_width: i32,
-        cell_color: rl.Color,
+        cell_height: i32,
+        color: rl.Color,
         // the space between cells
         cell_gap: i32,
+        render_mode: RenderMode,
     ) Grid {
         const matrix = alloc.alloc(Cell, @intCast(num_of_rows * num_of_cols)) catch @panic("OOM");
 
@@ -143,7 +152,7 @@ pub const Grid = struct {
             for (0..@intCast(num_of_cols)) |c| {
                 matrix[c + r * @as(u32, @intCast(num_of_cols))] = .{
                     .x = pos_start_x + @as(i32, @intCast((c))) * (cell_width + cell_gap),
-                    .y = pos_start_y + @as(i32, @intCast((r))) * (cell_width + cell_gap),
+                    .y = pos_start_y + @as(i32, @intCast((r))) * (cell_height + cell_gap),
                 };
             }
         }
@@ -153,8 +162,10 @@ pub const Grid = struct {
             .num_of_rows = num_of_rows,
             .num_of_cols = num_of_cols,
             .cell_width = cell_width,
-            .cell_color = cell_color,
+            .cell_height = cell_height,
+            .color = color,
             .cell_gap = cell_gap,
+            .render_mode = render_mode,
         };
     }
 
@@ -256,15 +267,56 @@ fn renderGrid(w: *World, _: std.mem.Allocator) !void {
     for (queries) |q| {
         const grid = q[0];
 
-        for (grid.matrix) |cell| {
-            rl.drawRectangle(
-                @intCast(cell.x),
-                @intCast(cell.y),
-                @intCast(grid.cell_width),
-                @intCast(grid.cell_width),
-                grid.cell_color,
-            );
+        switch (grid.render_mode) {
+            .line => renderGridLine(grid),
+            .block => renderGridBlock(grid),
+            .none => {},
         }
+    }
+}
+
+fn renderGridBlock(grid: Grid) void {
+    for (grid.matrix) |cell| {
+        rl.drawRectangle(
+            @intCast(cell.x),
+            @intCast(cell.y),
+            @intCast(grid.cell_width),
+            @intCast(grid.cell_height),
+            grid.color,
+        );
+    }
+}
+
+fn renderGridLine(grid: Grid) void {
+    const rows: usize = @intCast(grid.num_of_rows);
+    const cols: usize = @intCast(grid.num_of_cols);
+
+    // draw vertical lines
+    for (0..rows) |i| {
+        const idx_x1 = cols * i;
+        const idx_y1 = cols * (i + 1) - 1;
+
+        rl.drawLine(
+            grid.matrix[idx_x1].x,
+            grid.matrix[idx_x1].y,
+            grid.matrix[idx_y1].x,
+            grid.matrix[idx_y1].y,
+            .red,
+        );
+    }
+
+    // draw horizontal lines
+    for (0..cols) |i| {
+        const idx_x1 = i;
+        const idx_y1 = cols * (rows - 1) + i;
+
+        rl.drawLine(
+            grid.matrix[idx_x1].x,
+            grid.matrix[idx_x1].y,
+            grid.matrix[idx_y1].x,
+            grid.matrix[idx_y1].y,
+            .red,
+        );
     }
 }
 
