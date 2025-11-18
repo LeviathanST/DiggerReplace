@@ -71,6 +71,9 @@ pub fn renderButton(w: *World, _: std.mem.Allocator) !void {
     );
 }
 
+// TODO:
+// Grid should only draw lines, not block
+// references to component hierarchy in `Bevy` if want to draw blocks
 pub const Grid = struct {
     /// # Examples:
     /// * rows = 3, cols = 3
@@ -246,7 +249,7 @@ pub const Grid = struct {
     }
 };
 
-pub fn renderGrid(w: *World, _: std.mem.Allocator) !void {
+fn renderGrid(w: *World, _: std.mem.Allocator) !void {
     const queries = (try queryToRender(w, &.{Grid})) orelse return;
 
     for (queries) |q| {
@@ -264,7 +267,7 @@ pub fn renderGrid(w: *World, _: std.mem.Allocator) !void {
     }
 }
 
-pub fn queryToRender(w: *World, comptime types: []const type) !?[]std.meta.Tuple(types) {
+fn queryToRender(w: *World, comptime types: []const type) !?[]std.meta.Tuple(types) {
     return w.query(types) catch |err| switch (err) {
         World.GetComponentError.StorageNotFound => null,
         else => err,
