@@ -14,6 +14,7 @@ const circle = @import("common/circle.zig");
 pub const Position = position.Position;
 pub const Rectangle = rectangle.Rectangle;
 pub const Grid = grid.Grid;
+pub const InGrid = grid.InGrid;
 pub const Button = button.Button;
 pub const Circle = circle.Circle;
 

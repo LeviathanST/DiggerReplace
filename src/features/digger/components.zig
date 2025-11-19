@@ -8,4 +8,3 @@ pub const Digger = struct {
         c: i32,
     };
 };
-pub const InGrid = struct { grid_entity: World.EntityID };

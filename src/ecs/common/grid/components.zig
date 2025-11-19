@@ -1,6 +1,10 @@
 const std = @import("std");
 const rl = @import("raylib");
 
+/// Because we spawn a grid as an entity so another entities
+/// need which grid they are in via `InGrid`.
+pub const InGrid = struct { grid_entity: @import("../../World.zig").EntityID };
+
 /// # Examples:
 /// * rows = 3, cols = 3
 /// |--|--|--|
