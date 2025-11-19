@@ -9,5 +9,5 @@ pub const common = @import("ecs/common.zig");
 pub const CommonModule = common.CommonModule;
 
 test {
-    @import("std").testing.refAllDecls(@This());
+    @import("std").testing.refAllDeclsRecursive(@This());
 }
