@@ -1,12 +1,13 @@
 const std = @import("std");
 const rl = @import("raylib");
-const shared_components = @import("shared_components");
 
 const digger_mod = @import("features/digger/mod.zig");
 const area_mod = @import("features/area/mod.zig");
+const terminal_mod = @import("features/terminal/mod.zig");
+const debug_mod = @import("features/debug/mod.zig");
 
-const World = @import("ecs").World;
-const Grid = shared_components.Grid;
+const ecs = @import("ecs");
+const World = ecs.World;
 
 const GameAssets = @import("GameAssets.zig");
 
@@ -23,9 +24,10 @@ fn loop(alloc: std.mem.Allocator) !void {
     rl.setTargetFPS(60);
 
     try world
+        .addModules(&.{ecs.CommonModule})
         .addResource(GameAssets, .{})
         .addSystems(.update, &.{closeWindow})
-        .addModules(&.{ area_mod, digger_mod })
+        .addModules(&.{ area_mod, terminal_mod, debug_mod, digger_mod })
         .run();
 }
 

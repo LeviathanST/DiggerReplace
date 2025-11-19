@@ -1,16 +1,17 @@
 const std = @import("std");
-const systems = @import("systems.zig");
 
-const Position = @import("shared_components").Position;
+const Position = @import("ecs").common.Position;
 const World = @import("ecs").World;
 
 const InGrid = @import("components.zig").InGrid;
+
+const systems = @import("systems.zig");
+pub const action = @import("utils/action.zig");
 
 pub fn build(w: *World) void {
     _ = w
         .addSystem(.startup, spawn)
         .addSystems(.update, &.{
-        systems.control,
         systems.render,
     });
 }

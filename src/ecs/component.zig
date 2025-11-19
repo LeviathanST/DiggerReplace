@@ -29,7 +29,7 @@ pub const ErasedStorage = struct {
     pub inline fn cast(w: World, comptime T: type) !*Storage(T) {
         const Type = ecs_util.Deref(T);
         const hash = std.hash_map.hashString(@typeName(Type));
-        const s = w.component_storages.get(hash) orelse return error.ComponentStorageNotFound;
+        const s = w.component_storages.get(hash) orelse return World.GetComponentError.StorageNotFound;
         return ErasedStorage.castFromPtr(s.ptr, Type);
     }
 

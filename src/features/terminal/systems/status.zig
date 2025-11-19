@@ -1,0 +1,86 @@
+const std = @import("std");
+const rl = @import("raylib");
+const resource = @import("../resources.zig");
+const ecs_common = @import("ecs").common;
+const input = @import("input.zig");
+
+const World = @import("ecs").World;
+const Terminal = @import("../mod.zig").Terminal;
+
+const Rectangle = ecs_common.Rectangle;
+const Position = ecs_common.Position;
+const Button = ecs_common.Button;
+
+const State = resource.State;
+const Buffer = resource.Buffer;
+
+pub fn inHover(w: *World, _: std.mem.Allocator) !void {
+    const queries = try w.query(&.{
+        Position,
+        Rectangle,
+        Terminal,
+    });
+    const state = try w.getMutResource(State);
+    const pos, const rec, _ = queries[0];
+
+    const is_hovered = rl.checkCollisionPointRec(rl.getMousePosition(), .{
+        .x = @floatFromInt(pos.x),
+        .y = @floatFromInt(pos.y),
+        .width = @floatFromInt(rec.width),
+        .height = @floatFromInt(rec.height),
+    });
+
+    if (is_hovered) {
+        rl.setMouseCursor(.ibeam);
+        if (rl.isMouseButtonPressed(.left)) state.*.is_focused = true;
+    } else {
+        rl.setMouseCursor(.default);
+        if (rl.isMouseButtonPressed(.left)) state.*.is_focused = false;
+    }
+}
+
+pub fn inWindowResizing(w: *World, _: std.mem.Allocator) !void {
+    const queries = try w.query(&.{ *Position, Terminal });
+    const btn_queries = try w.query(&.{ *Position, Button });
+
+    const pos, _ = queries[0];
+    const btn_pos, _ = btn_queries[0];
+    if (rl.isWindowResized()) {
+        pos.x = rl.getScreenWidth() - 300;
+        btn_pos.y = pos.y + 350;
+        btn_pos.x = pos.x;
+    }
+}
+
+pub fn inFocused(w: *World, _: std.mem.Allocator) !void {
+    const state = try w.getMutResource(State);
+    const buf = try w.getMutResource(Buffer);
+
+    if (state.is_focused) {
+        try input.scan(
+            buf.chars,
+            &buf.char_count,
+            @intCast(buf.capacity),
+            &state.ts_backspace,
+        );
+    }
+}
+
+pub fn inClickedRun(w: *World, _: std.mem.Allocator) !void {
+    const pos, const rec, _, _ = (try w.query(&.{ Position, Rectangle, Button, Terminal }))[0];
+    const buf = try w.getResource(Buffer);
+
+    if (rl.checkCollisionPointRec(
+        rl.getMousePosition(),
+        .{
+            .x = @floatFromInt(pos.x),
+            .y = @floatFromInt(pos.y),
+            .width = @floatFromInt(rec.width),
+            .height = @floatFromInt(rec.height),
+        },
+    )) {
+        if (rl.isMouseButtonPressed(.left)) {
+            try input.process(w, buf.chars[0..@intCast(buf.char_count)]);
+        }
+    }
+}
