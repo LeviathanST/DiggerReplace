@@ -4,14 +4,18 @@ const rl = @import("raylib");
 const World = @import("World.zig");
 
 const position = @import("common/position.zig");
-const rectangle = @import("common/rectangle.zig");
 const grid = @import("common/grid/mod.zig");
 const button = @import("common/button.zig");
+
+// Shape components
+const rectangle = @import("common/rectangle.zig");
+const circle = @import("common/circle.zig");
 
 pub const Position = position.Position;
 pub const Rectangle = rectangle.Rectangle;
 pub const Grid = grid.Grid;
 pub const Button = button.Button;
+pub const Circle = circle.Circle;
 
 pub const CommonModule = struct {
     pub fn build(w: *World) void {
@@ -19,6 +23,7 @@ pub const CommonModule = struct {
             rectangle.render,
             button.render,
             grid.render,
+            circle.render,
         });
     }
 };
