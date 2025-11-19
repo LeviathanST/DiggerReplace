@@ -222,39 +222,39 @@ pub const Grid = struct {
 
     test "get actual position in the grid" {
         const alloc = std.testing.allocator;
-        var grid = Grid.init(alloc, 3, 3, 1, 1);
+        var grid = Grid.init(alloc, 0, 0, 3, 3, 1, 1, .blank, 1, .none);
         defer grid.deinit(alloc);
 
         const pos1 = try grid.getActualIndex(0, 0);
-        try std.testing.expect(pos1 == 0);
-        try std.testing.expect(grid.matrix[pos1].x == 0); // 0 * (1 + 1)
-        try std.testing.expect(grid.matrix[pos1].y == 0); // 0 * (1 + 1)
+        try std.testing.expectEqual(0, pos1);
+        try std.testing.expectEqual(0, grid.matrix[pos1].x); // 0 * (1 + 1)
+        try std.testing.expectEqual(0, grid.matrix[pos1].y); // 0 * (1 + 1)
 
         const pos2 = try grid.getActualIndex(1, 0);
-        try std.testing.expect(pos2 == 3);
-        try std.testing.expect(grid.matrix[pos2].x == 0); // 0 * (1 + 1)
-        try std.testing.expect(grid.matrix[pos2].y == 2); // 1 * (1 + 1)
+        try std.testing.expectEqual(pos2, 3);
+        try std.testing.expectEqual(0, grid.matrix[pos2].x); // 0 * (1 + 1)
+        try std.testing.expectEqual(2, grid.matrix[pos2].y); // 1 * (1 + 1)
 
         const pos3 = try grid.getActualIndex(1, 1);
-        try std.testing.expect(pos3 == 4);
-        try std.testing.expect(grid.matrix[pos3].x == 2); // 1 * (1 + 1)
-        try std.testing.expect(grid.matrix[pos3].y == 2); // 1 * (1 + 1)
+        try std.testing.expectEqual(4, pos3);
+        try std.testing.expectEqual(2, grid.matrix[pos3].x); // 1 * (1 + 1)
+        try std.testing.expectEqual(2, grid.matrix[pos3].y); // 1 * (1 + 1)
 
         try std.testing.expectError(Error.OverNumCol, grid.getActualIndex(0, 4));
         try std.testing.expectError(Error.OverNumRow, grid.getActualIndex(4, 0));
 
-        var grid2 = Grid.init(alloc, 2, 3, 2, 1);
+        var grid2 = Grid.init(alloc, 0, 0, 2, 3, 2, 2, .blank, 1, .none);
         defer grid2.deinit(alloc);
 
         const pos4 = try grid2.getActualIndex(0, 2);
-        try std.testing.expect(pos4 == 2);
-        try std.testing.expect(grid2.matrix[pos4].x == 6); // 2 * (2 + 1)
-        try std.testing.expect(grid2.matrix[pos4].y == 0); // 0 * (2 + 1)
+        try std.testing.expectEqual(2, pos4);
+        try std.testing.expectEqual(6, grid2.matrix[pos4].x); // 2 * (2 + 1)
+        try std.testing.expectEqual(0, grid2.matrix[pos4].y); // 0 * (2 + 1)
 
         const pos5 = try grid2.getActualIndex(1, 2);
-        try std.testing.expect(pos5 == 5);
-        try std.testing.expect(grid2.matrix[pos5].x == 6); // 2 * (2 + 1)
-        try std.testing.expect(grid2.matrix[pos5].y == 3); // 2 * (2 + 1)
+        try std.testing.expectEqual(5, pos5);
+        try std.testing.expectEqual(6, grid2.matrix[pos5].x); // 2 * (2 + 1)
+        try std.testing.expectEqual(3, grid2.matrix[pos5].y); // 2 * (2 + 1)
 
         try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(2, 3));
         try std.testing.expectError(Error.OverNumRow, grid2.getActualIndex(3, 4));
