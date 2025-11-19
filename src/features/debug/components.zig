@@ -1,6 +1,7 @@
 const rl = @import("raylib");
 
 pub const DebugInfo = struct {
+    score: i32 = 0,
     memory_usage: i32 = 0,
 };
 
