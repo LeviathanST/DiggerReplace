@@ -1,12 +1,13 @@
 const std = @import("std");
 const rl = @import("raylib");
+const ecs_common = @import("ecs").common;
 
 const World = @import("ecs").World;
-const Position = @import("ecs").common.Position;
-const Grid = @import("ecs").common.Grid;
+const Position = ecs_common.Position;
+const Grid = ecs_common.Grid;
+const InGrid = ecs_common.InGrid;
 
 const Digger = @import("mod.zig").Digger;
-const InGrid = @import("components.zig").InGrid;
 
 /// Draw all diggers
 pub fn updatePos(w: *World, _: std.mem.Allocator) !void {

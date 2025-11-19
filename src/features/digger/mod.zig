@@ -4,11 +4,11 @@ const ecs_common = @import("ecs").common;
 const Position = ecs_common.Position;
 const Circle = ecs_common.Circle;
 const Grid = ecs_common.Grid;
+const InGrid = ecs_common.InGrid;
 const World = @import("ecs").World;
 
 const Area = @import("../area/components.zig").Area;
 
-const InGrid = @import("components.zig").InGrid;
 pub const Digger = @import("components.zig").Digger;
 
 const systems = @import("systems.zig");
