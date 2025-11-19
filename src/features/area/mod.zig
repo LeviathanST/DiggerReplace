@@ -22,8 +22,10 @@ pub fn spawn(w: *World, _: std.mem.Allocator) !void {
             3,
             3,
             100,
+            100,
             .blue,
             5,
+            .block,
         ) },
     );
 }
