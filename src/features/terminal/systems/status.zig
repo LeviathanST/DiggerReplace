@@ -69,7 +69,7 @@ pub fn inFocused(w: *World, _: std.mem.Allocator) !void {
     }
 }
 
-pub fn inClickedRun(w: *World, _: std.mem.Allocator) !void {
+pub fn inClickedRun(w: *World, alloc: std.mem.Allocator) !void {
     const pos, const rec, _, _ = (try w.query(&.{ Position, Rectangle, Button, Terminal }))[0];
     const buf = try w.getResource(Buffer);
 
@@ -83,7 +83,7 @@ pub fn inClickedRun(w: *World, _: std.mem.Allocator) !void {
         },
     )) {
         if (rl.isMouseButtonPressed(.left)) {
-            try input.process(w, buf.chars[0..@intCast(buf.char_count)]);
+            try input.process(w, alloc, buf.chars);
         }
     }
 }
