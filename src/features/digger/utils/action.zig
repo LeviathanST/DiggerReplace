@@ -5,37 +5,41 @@ const World = @import("ecs").World;
 
 const Position = ecs_common.Position;
 const Grid = ecs_common.Grid;
-const InGrid = @import("../components.zig").InGrid;
+const InGrid = ecs_common.InGrid;
+const Digger = @import("../components.zig").Digger;
 
 const MoveDirection = enum { up, down, left, right };
 
-fn move(pos: *Position, grid: Grid, direction: MoveDirection) void {
+fn move(pos: *Digger.IndexInGrid, grid: Grid, direction: MoveDirection) void {
     switch (direction) {
         .up => {
-            if (pos.x - 1 >= 0)
-                pos.x -= 1;
+            if (pos.r - 1 >= 0)
+                pos.r -= 1;
         },
         .down => {
-            if (pos.x + 1 < grid.num_of_rows)
-                pos.x += 1;
+            if (pos.r + 1 < grid.num_of_rows)
+                pos.r += 1;
         },
         .left => {
-            if (pos.y - 1 >= 0)
-                pos.y -= 1;
+            if (pos.c - 1 >= 0)
+                pos.c -= 1;
         },
         .right => {
-            if (pos.y + 1 < grid.num_of_cols)
-                pos.y += 1;
+            if (pos.c + 1 < grid.num_of_cols)
+                pos.c += 1;
         },
     }
 }
 
 /// move the first digger
 pub fn control(w: *World, move_direction: MoveDirection) !void {
-    const pos, const in_grid = (try w.query(&.{ *Position, InGrid }))[0];
+    var digger, const in_grid = (try w.query(&.{
+        *Digger,
+        InGrid,
+    }))[0];
     const grid = try w.getComponent(in_grid.grid_entity, Grid);
 
-    move(pos, grid, move_direction);
+    move(&digger.idx_in_grid, grid, move_direction);
 }
 
 const Action = union(enum) {

@@ -1,0 +1,37 @@
+const std = @import("std");
+const ecs = @import("ecs");
+const ecs_common = ecs.common;
+
+const systems = @import("systems.zig");
+
+const Position = ecs_common.Position;
+const Circle = ecs_common.Circle;
+const InGrid = ecs_common.InGrid;
+const Grid = ecs_common.Grid;
+const World = ecs.World;
+
+const Point = @import("components.zig").Point;
+
+pub const Score = struct {
+    amount: i32 = 0,
+};
+
+pub fn build(w: *World) void {
+    _ = w
+        .addResource(Score, .{})
+        .addSystem(.startup, spawn)
+        .addSystems(.update, &.{
+        systems.updatePos,
+        systems.updateScore,
+    });
+}
+
+pub fn spawn(w: *World, _: std.mem.Allocator) !void {
+    const grid = try w.getComponent(0, Grid);
+    w.spawnEntity(&.{ Position, Point, Circle, InGrid }, .{
+        .{},
+        try .random(grid.num_of_cols, grid.num_of_rows),
+        .{ .radius = 5, .color = .yellow },
+        .{ .grid_entity = 0 },
+    });
+}

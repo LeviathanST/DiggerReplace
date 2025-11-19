@@ -1,3 +1,10 @@
 const World = @import("ecs").World;
 
-pub const InGrid = struct { grid_entity: World.EntityID };
+pub const Digger = struct {
+    idx_in_grid: IndexInGrid,
+
+    pub const IndexInGrid = struct {
+        r: i32,
+        c: i32,
+    };
+};
