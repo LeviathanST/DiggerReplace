@@ -2,6 +2,7 @@ const std = @import("std");
 const rl = @import("raylib");
 const digger = @import("../../digger/mod.zig");
 const interpreter = @import("../../interpreter/mod.zig");
+const utils = @import("../utils.zig");
 
 const World = @import("ecs").World;
 
@@ -30,12 +31,13 @@ pub fn scan(
         {
             const count_v = count.*;
             // NOTE: remove the space of `ENTER`
-            const count_zero = countZero(out[0..@intCast(count_v)]);
+            const count_zero = utils.skipChar(out[0..@intCast(count_v)], &[_]u8{0});
+            const count_cr = utils.skipChar(out[0..@intCast(count_v - count_zero)], "\r");
 
             ts_backspace.* = std.time.microTimestamp();
             count.* -= blk: {
-                if (count_zero != 0) {
-                    break :blk count_zero;
+                if (count_zero != 0 or count_cr != 0) {
+                    break :blk count_zero + count_cr;
                 } else {
                     break :blk 1;
                 }
@@ -46,40 +48,18 @@ pub fn scan(
         if (rl.isKeyDown(.enter)) {
             ts_backspace.* = std.time.microTimestamp();
             const remaning_to_new_line = width - @mod(count.*, width);
+            out[@intCast(count.*)] = '\r';
             count.* += remaning_to_new_line;
         }
     }
 }
 
-/// returns amount of zero in the loop from the end.
-fn countZero(str: []const u8) i32 {
-    var idx: isize = @intCast(str.len - 1);
-    var count: i32 = 0;
-    while (idx >= 0) {
-        if (str[@intCast(idx)] != 0) break;
-        idx -= 1;
-        count += 1;
-    }
-    return count;
-}
-
-test "test" {
-    const str1 = std.mem.zeroes([10]u8);
-    try std.testing.expectEqual(10, countZero(&str1));
-
-    var str2 = std.mem.zeroes([10]u8);
-    str2[9] = 'A';
-    try std.testing.expectEqual(0, countZero(&str2));
-
-    var str3 = std.mem.zeroes([10]u8);
-    str3[6] = 'A';
-    try std.testing.expectEqual(3, countZero(&str3));
-}
-
 pub fn process(w: *World, alloc: std.mem.Allocator, content: [:0]const u8) !void {
+    std.log.debug("Input: {s}", .{content});
     // TODO: handle error
-    const action = try interpreter.parse(alloc, content, .plaintext);
-    switch (action) {
-        .move => |direction| try digger.action.control(w, direction),
+    if (try interpreter.parse(alloc, content, .zig)) |action| {
+        switch (action) {
+            .move => |direction| try digger.action.control(w, direction),
+        }
     }
 }
