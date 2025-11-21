@@ -83,7 +83,7 @@ pub fn inClickedRun(w: *World, alloc: std.mem.Allocator) !void {
         },
     )) {
         if (rl.isMouseButtonPressed(.left)) {
-            try input.process(w, alloc, buf.chars);
+            try input.process(w, alloc, buf.chars[0..@intCast(buf.char_count)]);
         }
     }
 }
