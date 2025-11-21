@@ -12,6 +12,7 @@ const std = @import("std");
 const utils = @import("utils.zig");
 
 pub const plaintext = @import("plaintext.zig");
+pub const zig = @import("zig.zig");
 
 const Interpreter = @This();
 
@@ -19,12 +20,21 @@ errors: std.ArrayList(Error) = .empty,
 
 pub const Error = struct {
     tag: Tag,
-    extra: ?struct {
+    extra: union(enum) {
+        none: void,
         expected_token: []const u8,
-    } = null,
+        from_languages: [][]const u8,
+    } = .{ .none = {} },
     token: []const u8,
 
     pub const Tag = enum {
+        /// Some languages need to define main functions
+        /// like Zig, C, C++, Rust, and more. This error
+        /// occurs when using those languages but players
+        /// not define the `main` function.
+        main_not_found,
+        /// the errors are exposed from implemented languages.
+        from_languages,
         unknown_action,
         expected_type_action,
         /// Errors in development
@@ -36,10 +46,16 @@ pub const Error = struct {
     /// TODO: display hints to fix error.
     pub fn render(err: Error, w: *std.Io.Writer) !void {
         try switch (err.tag) {
+            .main_not_found => w.print("requires the `main` function to run.\n", .{}),
+            .from_languages => {
+                for (err.extra.from_languages) |msg| {
+                    try w.print("{s}\n", .{msg});
+                }
+            },
             .unknown_action => w.print("function `{s}` unknown.\n", .{err.token}),
             .expected_type_action => w.print(
                 "expected `{s}` type, found `{s}`.\n",
-                .{ err.extra.?.expected_token, err.token },
+                .{ err.extra.expected_token, err.token },
             ),
             // TODO: remove this error
             .not_supported_type => w.print(
@@ -105,6 +121,7 @@ pub const Command = union(enum) {
             arg_value: []const u8,
             node_tag: std.zig.Ast.Node.Tag,
         ) ?@FieldType(Command, action) {
+            // TODO: handle more data types
             switch (@typeInfo(@FieldType(Command, action))) {
                 .@"enum" => {
                     std.debug.assert(node_tag == .enum_literal);
@@ -136,6 +153,7 @@ pub const Command = union(enum) {
 };
 
 const Language = enum {
+    zig,
     plaintext,
 };
 
@@ -148,6 +166,7 @@ pub fn parse(
     const normalized_source = try utils.normalizedSource(alloc, source);
 
     const action = try switch (lang) {
+        .zig => zig.parse(alloc, self, normalized_source),
         .plaintext => blk: {
             const sentinel_idx = std.mem.indexOfSentinel(u8, 0, normalized_source);
             break :blk plaintext.parse(alloc, self, source[0..sentinel_idx]);
