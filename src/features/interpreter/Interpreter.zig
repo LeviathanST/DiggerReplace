@@ -9,6 +9,7 @@
 //! * Plaintext
 //! * Zig (WIP)
 const std = @import("std");
+const utils = @import("utils.zig");
 
 pub const plaintext = @import("plaintext.zig");
 
@@ -49,55 +50,93 @@ pub const Error = struct {
     }
 };
 
-const Language = enum {
-    plaintext,
-};
-
 pub const Command = union(enum) {
     /// Nothing action will be executed, the parser should return errors
     none,
     move: @import("../digger/mod.zig").action.MoveDirection,
 
-    /// return `null` if the action not found.
-    pub fn get(
-        action: []const u8,
-        args: []const u8,
-        node_tag: std.zig.Ast.Node.Tag,
-    ) !?Command {
-        inline for (std.meta.fields(Command)) |f| {
-            if (std.mem.eql(u8, f.name, action)) {
-                const arg = Command.getArgType(
-                    f.name,
-                    args,
-                    node_tag,
-                );
-                return @unionInit(Command, f.name, arg);
+    pub const Parser = struct {
+        alloc: std.mem.Allocator,
+        interpreter: *Interpreter,
+
+        pub fn init(alloc: std.mem.Allocator, i: *Interpreter) Parser {
+            return .{
+                .alloc = alloc,
+                .interpreter = i,
+            };
+        }
+
+        pub fn parse(
+            self: Parser,
+            cmd_name: []const u8,
+            arg_value: []const u8,
+            node_tag: std.zig.Ast.Node.Tag,
+        ) Command {
+            inline for (std.meta.fields(Command)) |f| {
+                if (std.mem.eql(u8, f.name, cmd_name)) {
+                    if (self.parseArg(
+                        f.name,
+                        arg_value,
+                        node_tag,
+                    )) |arg| {
+                        return @unionInit(Command, f.name, arg);
+                    } else return .none;
+                }
+            }
+
+            self.interpreter.appendError(self.alloc, .{
+                .tag = .unknown_action,
+                .token = cmd_name,
+            });
+            return .none;
+        }
+
+        /// Initialized the arguments of a command based
+        /// on `arg_value`.
+        ///
+        /// Return null if the `arg_value` is invalid
+        /// (currently, only `value not found` in enums).
+        ///
+        /// This function assert the `node_tag` should
+        /// correspond to the command's arg types.
+        pub fn parseArg(
+            self: Parser,
+            comptime action: []const u8,
+            arg_value: []const u8,
+            node_tag: std.zig.Ast.Node.Tag,
+        ) ?@FieldType(Command, action) {
+            switch (@typeInfo(@FieldType(Command, action))) {
+                .@"enum" => {
+                    std.debug.assert(node_tag == .enum_literal);
+
+                    const action_type = @FieldType(Command, action);
+                    const normalized_action_type = utils.normalizedActionType(
+                        self.alloc,
+                        @typeName(action_type),
+                    );
+
+                    return std.meta.stringToEnum(
+                        action_type,
+                        arg_value,
+                    ) orelse {
+                        self.interpreter.appendError(self.alloc, .{
+                            .tag = .expected_type_action,
+                            .extra = .{
+                                .expected_token = normalized_action_type,
+                            },
+                            .token = arg_value,
+                        });
+                        return null;
+                    };
+                },
+                else => unreachable, // not supported type
             }
         }
-        return null;
-    }
+    };
+};
 
-    /// Get the arguments of an action.
-    ///
-    /// This function assert the `node_tag` should
-    /// be corresponding with the arg type.
-    pub fn getArgType(
-        comptime action: []const u8,
-        arg_value: []const u8,
-        node_tag: std.zig.Ast.Node.Tag,
-    ) @FieldType(Command, action) {
-        switch (@typeInfo(@FieldType(Command, action))) {
-            .@"enum" => {
-                std.debug.assert(node_tag == .enum_literal);
-
-                return std.meta.stringToEnum(
-                    @FieldType(Command, action),
-                    arg_value,
-                );
-            },
-            else => unreachable, // not supported type
-        }
-    }
+const Language = enum {
+    plaintext,
 };
 
 pub fn parse(
@@ -106,7 +145,7 @@ pub fn parse(
     source: []const u8,
     lang: Language,
 ) !Command {
-    const normalized_source = try normalizedSource(alloc, source);
+    const normalized_source = try utils.normalizedSource(alloc, source);
 
     const action = try switch (lang) {
         .plaintext => blk: {
@@ -127,17 +166,7 @@ pub fn parse(
     return action;
 }
 
-/// Normalized the source code:
-/// * Trimming.
-/// * Remove null-character.
-pub fn normalizedSource(alloc: std.mem.Allocator, source: []const u8) ![:0]const u8 {
-    var list: std.ArrayList(u8) = .empty;
-    const trimmed = std.mem.trim(u8, source, " ");
-
-    for (trimmed) |c| {
-        if (c != 0) {
-            try list.append(alloc, c);
-        }
-    }
-    return list.toOwnedSliceSentinel(alloc, 0);
+/// This function can cause to panic due to out of memory
+pub fn appendError(self: *Interpreter, alloc: std.mem.Allocator, err: Error) void {
+    self.errors.append(alloc, err) catch @panic("OOM");
 }

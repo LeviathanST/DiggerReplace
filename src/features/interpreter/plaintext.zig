@@ -14,57 +14,19 @@ pub fn parse(
     const trimmed = std.mem.trim(u8, source, " ");
     var iter = std.mem.splitScalar(u8, trimmed, ' ');
 
-    var method: []const u8 = undefined;
+    const command_parser: Command.Parser = .init(alloc, interpreter);
 
-    while (iter.next()) |action| {
-        method = action;
-        inline for (std.meta.fields(Command)) |field| {
-            if (std.mem.eql(u8, field.name, action)) {
-                const should_be_value = iter.next() orelse {
-                    try interpreter.errors.append(alloc, .{
-                        .tag = .expected_type_action,
-                        .extra = .{ .expected_token = "up/down/left/right" },
-                        .token = "",
-                    });
-                    return .none;
-                };
+    const cmd: []const u8 = iter.first();
+    const should_be_value = iter.next() orelse {
+        interpreter.appendError(alloc, .{
+            .tag = .expected_type_action,
+            .extra = .{ .expected_token = "arguments" },
+            .token = "empty",
+        });
+        return .none;
+    };
 
-                switch (@typeInfo(field.type)) {
-                    .@"enum" => {
-                        // TODO: handle check enum values
-                        const enum_value = std.meta.stringToEnum(
-                            field.type,
-                            should_be_value,
-                        );
-                        if (enum_value) |v| {
-                            return @unionInit(Command, field.name, v);
-                        } else {
-                            try interpreter.errors.append(alloc, .{
-                                .tag = .expected_type_action,
-                                .extra = .{ .expected_token = "up/down/left/right" },
-                                .token = should_be_value,
-                            });
-                            return .none;
-                        }
-                    },
-                    else => {
-                        const T = field.type;
-                        try interpreter.errors.append(alloc, .{
-                            .tag = .not_supported_type,
-                            .token = @typeName(T),
-                        });
-                        return .none;
-                    },
-                }
-            }
-        }
-    }
-
-    try interpreter.errors.append(
-        alloc,
-        .{ .tag = .unknown_action, .token = method },
-    );
-    return .none;
+    return command_parser.parse(cmd, should_be_value, .enum_literal);
 }
 
 test "parse action (plaintext)" {
@@ -81,22 +43,22 @@ test "parse action (plaintext)" {
     const result_1: Command = .{
         .move = .up,
     };
-    try std.testing.expectEqual(parsed_1, result_1);
+    try std.testing.expectEqual(result_1, parsed_1);
 
-    const action_2 = "nothing";
+    const action_2 = "nothing arg";
     _ = try parse(alloc, &interpreter, action_2);
 
-    try std.testing.expectEqual(list_err.*.getLast(), Error{
+    try std.testing.expectEqualDeep(Error{
         .tag = .unknown_action,
         .token = "nothing",
-    });
+    }, list_err.*.getLast());
 
     const action_3 = "move forward";
     _ = try parse(alloc, &interpreter, action_3);
 
-    try std.testing.expectEqualDeep(list_err.*.getLast(), Error{
+    try std.testing.expectEqualDeep(Error{
         .tag = .expected_type_action,
-        .extra = .{ .expected_token = "up/down/left/right" },
+        .extra = .{ .expected_token = "digger.MoveDirection" },
         .token = "forward",
-    });
+    }, list_err.*.getLast());
 }
