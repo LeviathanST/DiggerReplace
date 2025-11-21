@@ -10,6 +10,7 @@ const Terminal = @import("../mod.zig").Terminal;
 const Rectangle = ecs_common.Rectangle;
 const Position = ecs_common.Position;
 const Button = ecs_common.Button;
+const Grid = ecs_common.Grid;
 
 const State = resource.State;
 const Buffer = resource.Buffer;
@@ -55,10 +56,12 @@ pub fn inWindowResizing(w: *World, _: std.mem.Allocator) !void {
 pub fn inFocused(w: *World, _: std.mem.Allocator) !void {
     const state = try w.getMutResource(State);
     const buf = try w.getMutResource(Buffer);
+    const grid = (try w.query(&.{ Grid, Terminal }))[0][0];
 
     if (state.is_focused) {
         try input.scan(
             buf.chars,
+            grid.num_of_cols,
             &buf.char_count,
             @intCast(buf.capacity),
             &state.ts_backspace,
@@ -66,7 +69,7 @@ pub fn inFocused(w: *World, _: std.mem.Allocator) !void {
     }
 }
 
-pub fn inClickedRun(w: *World, _: std.mem.Allocator) !void {
+pub fn inClickedRun(w: *World, alloc: std.mem.Allocator) !void {
     const pos, const rec, _, _ = (try w.query(&.{ Position, Rectangle, Button, Terminal }))[0];
     const buf = try w.getResource(Buffer);
 
@@ -80,7 +83,7 @@ pub fn inClickedRun(w: *World, _: std.mem.Allocator) !void {
         },
     )) {
         if (rl.isMouseButtonPressed(.left)) {
-            try input.process(w, buf.chars[0..@intCast(buf.char_count)]);
+            try input.process(w, alloc, buf.chars[0..@intCast(buf.char_count)]);
         }
     }
 }

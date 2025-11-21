@@ -35,7 +35,7 @@ pub fn render(w: *World, _: std.mem.Allocator) !void {
 
 fn drawContent(grid: Grid, content: [:0]u8, style: Style, pad: Padding) void {
     for (content, 0..) |c, i| {
-        if (c != 0) {
+        if (c != 0 and c != 13) {
             const real_pos = grid.matrix[i];
 
             rl.drawTextEx(

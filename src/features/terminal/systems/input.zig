@@ -1,11 +1,14 @@
 const std = @import("std");
 const rl = @import("raylib");
 const digger = @import("../../digger/mod.zig");
+const utils = @import("../utils.zig");
 
+const Interpreter = @import("../../interpreter/Interpreter.zig");
 const World = @import("ecs").World;
 
 pub fn scan(
     out: []u8,
+    width: i32,
     count: *i32,
     max_length: i32,
     ts_backspace: *i64,
@@ -19,19 +22,53 @@ pub fn scan(
             out[@intCast(count.* - 1)] = @intCast(keyInt);
         }
     }
-    if ((rl.isKeyDown(.backspace)) and
-        (count.* > 0) and
-        ((std.time.microTimestamp() - ts_backspace.*) > @divTrunc(1000000, 10))) // 0.1s
+
+    // handle key holding
+    if ((std.time.microTimestamp() - ts_backspace.*) > @divTrunc(1000000, 10)) // 0.1s
     {
-        ts_backspace.* = std.time.microTimestamp();
-        count.* -= 1;
-        out[@intCast(count.*)] = 0;
+        if (rl.isKeyDown(.backspace) and
+            (count.* > 0))
+        {
+            const count_v = count.*;
+            // NOTE: remove the space of `ENTER`
+            const count_zero = utils.skipChar(out[0..@intCast(count_v)], &[_]u8{0});
+            var count_cr = utils.skipChar(out[0..@intCast(count_v - count_zero)], "\r\n");
+
+            const total = count_zero + count_cr;
+
+            ts_backspace.* = std.time.microTimestamp();
+            count.* -= blk: {
+                if (count_zero != 0 or count_cr != 0) {
+                    break :blk total;
+                } else {
+                    break :blk 1;
+                }
+            };
+            if (count_cr > 0) {
+                while (count_cr > 0) : (count_cr -= 1) {
+                    out[@intCast(count_v - count_zero)] = 0;
+                }
+            } else {
+                out[@intCast(count.*)] = 0;
+            }
+        }
+
+        if (rl.isKeyDown(.enter)) {
+            ts_backspace.* = std.time.microTimestamp();
+            const remaning_to_new_line = width - @mod(count.*, width);
+            out[@intCast(count.*)] = '\r';
+            out[@intCast(count.* + 1)] = '\n';
+            count.* += remaning_to_new_line;
+        }
     }
 }
 
-pub fn process(w: *World, content: []const u8) !void {
-    const action = try digger.action.parse(content);
+pub fn process(w: *World, alloc: std.mem.Allocator, content: []const u8) !void {
+    var interpreter: Interpreter = .{};
+
+    const action = try interpreter.parse(alloc, content, .plaintext);
     switch (action) {
         .move => |direction| try digger.action.control(w, direction),
+        .none => {},
     }
 }
