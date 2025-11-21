@@ -1,7 +1,7 @@
 const std = @import("std");
 const ecs_common = @import("ecs").common;
 
-const interpreter = @import("../../interpreter/mod.zig");
+const Interpreter = @import("../../interpreter/Interpreter.zig");
 
 const World = @import("ecs").World;
 
